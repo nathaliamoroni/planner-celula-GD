@@ -1075,12 +1075,24 @@ const coreRef = doc(db, 'planners', 'peregrinos');
 const photosRef = collection(db, 'plannerPhotos');
 let cloudReady = false;
 let saveTimer = null;
-let localSavePending = false;
 let latestCore = null;
 let latestPhotos = new Map();
 let knownPhotoState = new Map();
 let unsubCore = null;
 let unsubPhotos = null;
+
+// Fila de sincronização: mantém sempre a alteração MAIS RECENTE e impede
+// que uma gravação antiga termine depois de uma nova e deixe o Firestore desatualizado.
+let queuedCloudData = null;
+let cloudWriteInFlight = false;
+let cloudWriteRevision = 0;
+let lastAppliedRemoteRevision = 0;
+
+function cloneData(value){ return JSON.parse(JSON.stringify(value)); }
+function syncTimeLabel(){
+  try{ return new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
+  catch(_){ return ''; }
+}
 
 function makeAuthUi(){
   const style=document.createElement('style');
@@ -1142,7 +1154,7 @@ function setUserUi(user){
 }
 
 function splitForCloud(data){
-  const core=JSON.parse(JSON.stringify(data));
+  const core=cloneData(data);
   const photos=new Map();
   ['celula','gdJovens','gdAdultos'].forEach(group=>{
     (core[group]?.pessoas||[]).forEach(p=>{
@@ -1153,7 +1165,7 @@ function splitForCloud(data){
 }
 function combineCloud(){
   if(!latestCore) return;
-  const merged=JSON.parse(JSON.stringify(latestCore));
+  const merged=cloneData(latestCore);
   ['celula','gdJovens','gdAdultos'].forEach(group=>{
     (merged[group]?.pessoas||[]).forEach(p=>{
       const hit=latestPhotos.get(`${group}__${p.id}`);
@@ -1163,16 +1175,15 @@ function combineCloud(){
   window.applyPlannerCloudData(merged);
 }
 
-async function writeCloudNow(data){
+async function performCloudWrite(data, revision){
   if(!cloudReady || !auth.currentUser) return;
   setSyncStatus('Salvando…', false);
   const {core,photos}=splitForCloud(data);
-  // Mantém o estado local como fonte de verdade enquanto a gravação está em andamento.
-  // Isso evita que um snapshot antigo do Firestore desfaça uma edição/exclusão recém-feita.
-  latestCore=JSON.parse(JSON.stringify(core));
-  latestPhotos=new Map([...photos].map(([id,obj])=>[id,JSON.parse(JSON.stringify(obj))]));
-  localSavePending=true;
-  await setDoc(coreRef, { data: core, updatedAt: serverTimestamp() }, {merge:false});
+
+  // Grava uma revisão numérica junto com os dados. Isso permite distinguir
+  // snapshots mais antigos que ainda estejam chegando de outra aba/dispositivo.
+  await setDoc(coreRef, { data: core, revision, updatedAt: serverTimestamp() }, {merge:false});
+
   const batch=writeBatch(db);
   let ops=0;
   for(const [id,obj] of photos){
@@ -1182,23 +1193,44 @@ async function writeCloudNow(data){
     if(!photos.has(id)){ batch.delete(doc(db,'plannerPhotos',id)); ops++; }
   }
   if(ops) await batch.commit();
+
+  latestCore=cloneData(core);
+  latestPhotos=new Map([...photos].map(([id,obj])=>[id,cloneData(obj)]));
   knownPhotoState=new Map([...photos].map(([id,obj])=>[id,obj.foto]));
-  localSavePending=false;
-  setSyncStatus('Sincronizado');
+  lastAppliedRemoteRevision=Math.max(lastAppliedRemoteRevision, revision);
+  setSyncStatus(`Sincronizado ${syncTimeLabel()}`);
 }
+
+async function flushCloudQueue(){
+  if(cloudWriteInFlight || !cloudReady || !auth.currentUser) return;
+  cloudWriteInFlight=true;
+  try{
+    while(queuedCloudData && cloudReady && auth.currentUser){
+      const data=queuedCloudData;
+      queuedCloudData=null;
+      const revision=++cloudWriteRevision;
+      await performCloudWrite(data, revision);
+      // Se houve novas alterações durante o await, o while grava somente a mais recente.
+    }
+  }catch(err){
+    console.error('Erro ao sincronizar planner',err);
+    setSyncStatus('Erro ao sincronizar',false);
+    // Mantém os dados atuais enfileirados para uma próxima tentativa.
+    if(!queuedCloudData) queuedCloudData=cloneData(window.getPlannerData());
+  }finally{
+    cloudWriteInFlight=false;
+    if(queuedCloudData && cloudReady && auth.currentUser){
+      setTimeout(()=>flushCloudQueue(),300);
+    }
+  }
+}
+
 window.queuePlannerCloudSave=(data)=>{
-  if(!cloudReady) return;
+  // Mesmo se o Firebase ainda estiver conectando, não perdemos a alteração:
+  // ela fica na fila e será enviada assim que cloudReady=true.
+  queuedCloudData=cloneData(data);
   clearTimeout(saveTimer);
-  localSavePending=true;
-  // Atualiza imediatamente o espelho em memória para nenhuma notificação remota antiga
-  // sobrescrever a alteração antes do debounce terminar.
-  const localSplit=splitForCloud(data);
-  latestCore=JSON.parse(JSON.stringify(localSplit.core));
-  latestPhotos=new Map([...localSplit.photos].map(([id,obj])=>[id,JSON.parse(JSON.stringify(obj))]));
-  saveTimer=setTimeout(()=>writeCloudNow(data).catch(err=>{
-    localSavePending=false;
-    console.error(err); setSyncStatus('Erro ao sincronizar',false);
-  }),250);
+  saveTimer=setTimeout(()=>flushCloudQueue(),180);
 };
 
 async function loadInitialCloud(){
@@ -1209,26 +1241,44 @@ async function loadInitialCloud(){
     latestPhotos=new Map();
     photoSnap.forEach(d=> latestPhotos.set(d.id,d.data()));
     knownPhotoState=new Map([...latestPhotos].map(([id,obj])=>[id,obj.foto]));
+
     if(snap.exists()){
-      latestCore=snap.data().data || snap.data();
+      const payload=snap.data();
+      latestCore=payload.data || payload;
+      lastAppliedRemoteRevision=Number(payload.revision||0);
+      cloudWriteRevision=Math.max(cloudWriteRevision,lastAppliedRemoteRevision);
       combineCloud();
       cloudReady=true;
     }else{
-      // Primeiro uso: cria o documento inicial usando o estado atual do planner.
       cloudReady=true;
-      await writeCloudNow(window.getPlannerData());
+      queuedCloudData=cloneData(window.getPlannerData());
+      await flushCloudQueue();
     }
-    setSyncStatus('Sincronizado');
+
+    // Se o usuário fez alguma alteração enquanto o Firebase conectava, envia agora.
+    if(queuedCloudData) await flushCloudQueue();
+    setSyncStatus(`Sincronizado ${syncTimeLabel()}`);
+
     unsubCore=onSnapshot(coreRef,s=>{
       if(!s.exists()) return;
-      // Enquanto há uma alteração local aguardando/sendo salva, não aplicamos
-      // snapshots remotos potencialmente antigos sobre a interface.
-      if(localSavePending && !s.metadata.hasPendingWrites) return;
-      latestCore=s.data().data || s.data();
+      const payload=s.data();
+      const remoteRevision=Number(payload.revision||0);
+
+      // Snapshots locais/pendentes e revisões antigas não devem sobrescrever a interface.
+      if(s.metadata.hasPendingWrites) return;
+      if(cloudWriteInFlight || queuedCloudData) return;
+      if(remoteRevision && remoteRevision < lastAppliedRemoteRevision) return;
+
+      latestCore=payload.data || payload;
+      lastAppliedRemoteRevision=Math.max(lastAppliedRemoteRevision,remoteRevision);
+      cloudWriteRevision=Math.max(cloudWriteRevision,remoteRevision);
       combineCloud();
+      setSyncStatus(`Sincronizado ${syncTimeLabel()}`);
     },err=>console.error('Firestore core snapshot',err));
+
     unsubPhotos=onSnapshot(photosRef,s=>{
-      if(localSavePending && !s.metadata.hasPendingWrites) return;
+      if(s.metadata.hasPendingWrites) return;
+      if(cloudWriteInFlight || queuedCloudData) return;
       latestPhotos=new Map();
       s.forEach(d=>latestPhotos.set(d.id,d.data()));
       knownPhotoState=new Map([...latestPhotos].map(([id,obj])=>[id,obj.foto]));
@@ -1248,6 +1298,7 @@ async function loadInitialCloud(){
 onAuthStateChanged(auth, async user=>{
   if(unsubCore){unsubCore();unsubCore=null;} if(unsubPhotos){unsubPhotos();unsubPhotos=null;}
   cloudReady=false;
+  cloudWriteInFlight=false;
   if(!user){ setGate(true,''); return; }
   setUserUi(user);
   setGate(false);
