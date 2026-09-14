@@ -821,8 +821,27 @@ function handleAction(ds){
     case 'excluir-pessoa': if(confirm('Excluir esta pessoa?')){ DATA[grupo].pessoas = DATA[grupo].pessoas.filter(x=>x.id!==ds.id); saveData(DATA); render(); } break;
 
     case 'novo-encontro': openModal('Nova reunião', encontroFields(), {}, (v)=>{ DATA[grupo].encontros.push(formatEncontro(v)); saveData(DATA); render(); }); break;
-    case 'editar-encontro': { const e = DATA[grupo].encontros.find(x=>x.id===ds.id); openModal('Editar reunião', encontroFields(), flattenEncontro(e), (v)=>{ Object.assign(e, formatEncontro(v)); e.id=ds.id; saveData(DATA); render(); }); break; }
-    case 'excluir-encontro': if(confirm('Excluir esta reunião?')){ DATA[grupo].encontros = DATA[grupo].encontros.filter(x=>x.id!==ds.id); saveData(DATA); render(); } break;
+    case 'editar-encontro': {
+      const e = DATA[grupo]?.encontros?.find(x=>x.id===ds.id);
+      if(!e){ alert('Não encontrei esta reunião para editar. Atualize a página e tente novamente.'); break; }
+      openModal('Editar reunião', encontroFields(), flattenEncontro(e), (v)=>{
+        const atualizado=formatEncontro(v);
+        Object.assign(e, atualizado, {id:ds.id});
+        saveData(DATA);
+        render();
+      });
+      break;
+    }
+    case 'excluir-encontro': {
+      const lista=DATA[grupo]?.encontros||[];
+      if(!lista.some(x=>x.id===ds.id)){ alert('Não encontrei esta reunião para excluir. Atualize a página e tente novamente.'); break; }
+      if(confirm('Excluir esta reunião?')){
+        DATA[grupo].encontros = lista.filter(x=>x.id!==ds.id);
+        saveData(DATA);
+        render();
+      }
+      break;
+    }
 
     case 'novo-checklist': openModal('Novo item do checklist', [{key:'texto',label:'Item',type:'text'}], {}, (v)=>{ DATA[grupo].checklist.push({id:uid(), texto:v.texto, feito:false}); saveData(DATA); render(); }); break;
     case 'editar-checklist': { const c = DATA[grupo].checklist.find(x=>x.id===ds.id); openModal('Editar item do checklist', [{key:'texto',label:'Item',type:'text'}], c, (v)=>{ c.texto=v.texto; saveData(DATA); render(); }); break; }
@@ -1042,6 +1061,7 @@ const coreRef = doc(db, 'planners', 'peregrinos');
 const photosRef = collection(db, 'plannerPhotos');
 let cloudReady = false;
 let saveTimer = null;
+let localSavePending = false;
 let latestCore = null;
 let latestPhotos = new Map();
 let knownPhotoState = new Map();
@@ -1133,6 +1153,11 @@ async function writeCloudNow(data){
   if(!cloudReady || !auth.currentUser) return;
   setSyncStatus('Salvando…', false);
   const {core,photos}=splitForCloud(data);
+  // Mantém o estado local como fonte de verdade enquanto a gravação está em andamento.
+  // Isso evita que um snapshot antigo do Firestore desfaça uma edição/exclusão recém-feita.
+  latestCore=JSON.parse(JSON.stringify(core));
+  latestPhotos=new Map([...photos].map(([id,obj])=>[id,JSON.parse(JSON.stringify(obj))]));
+  localSavePending=true;
   await setDoc(coreRef, { data: core, updatedAt: serverTimestamp() }, {merge:false});
   const batch=writeBatch(db);
   let ops=0;
@@ -1144,14 +1169,22 @@ async function writeCloudNow(data){
   }
   if(ops) await batch.commit();
   knownPhotoState=new Map([...photos].map(([id,obj])=>[id,obj.foto]));
+  localSavePending=false;
   setSyncStatus('Sincronizado');
 }
 window.queuePlannerCloudSave=(data)=>{
   if(!cloudReady) return;
   clearTimeout(saveTimer);
+  localSavePending=true;
+  // Atualiza imediatamente o espelho em memória para nenhuma notificação remota antiga
+  // sobrescrever a alteração antes do debounce terminar.
+  const localSplit=splitForCloud(data);
+  latestCore=JSON.parse(JSON.stringify(localSplit.core));
+  latestPhotos=new Map([...localSplit.photos].map(([id,obj])=>[id,JSON.parse(JSON.stringify(obj))]));
   saveTimer=setTimeout(()=>writeCloudNow(data).catch(err=>{
+    localSavePending=false;
     console.error(err); setSyncStatus('Erro ao sincronizar',false);
-  }),450);
+  }),250);
 };
 
 async function loadInitialCloud(){
@@ -1165,18 +1198,23 @@ async function loadInitialCloud(){
     if(snap.exists()){
       latestCore=snap.data().data || snap.data();
       combineCloud();
+      cloudReady=true;
     }else{
-      // Primeiro uso: não publica dados privados embutidos no HTML. O usuário pode importar seu backup JSON.
+      // Primeiro uso: cria o documento inicial usando o estado atual do planner.
+      cloudReady=true;
       await writeCloudNow(window.getPlannerData());
     }
-    cloudReady=true;
     setSyncStatus('Sincronizado');
     unsubCore=onSnapshot(coreRef,s=>{
       if(!s.exists()) return;
+      // Enquanto há uma alteração local aguardando/sendo salva, não aplicamos
+      // snapshots remotos potencialmente antigos sobre a interface.
+      if(localSavePending && !s.metadata.hasPendingWrites) return;
       latestCore=s.data().data || s.data();
       combineCloud();
     },err=>console.error('Firestore core snapshot',err));
     unsubPhotos=onSnapshot(photosRef,s=>{
+      if(localSavePending && !s.metadata.hasPendingWrites) return;
       latestPhotos=new Map();
       s.forEach(d=>latestPhotos.set(d.id,d.data()));
       knownPhotoState=new Map([...latestPhotos].map(([id,obj])=>[id,obj.foto]));
