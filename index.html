@@ -369,11 +369,32 @@ const seedData = {
   }
 };
 
+function stableHash(text){
+  let h=2166136261;
+  for(let i=0;i<text.length;i++){ h ^= text.charCodeAt(i); h = Math.imul(h,16777619); }
+  return (h>>>0).toString(36);
+}
+function ensureMeetingIds(data){
+  let changed=false;
+  ['celula','gdJovens','gdAdultos'].forEach(group=>{
+    const list=data?.[group]?.encontros;
+    if(!Array.isArray(list)) return;
+    list.forEach((e,index)=>{
+      if(!e.id || e.id==='undefined' || e.id==='null'){
+        const basis=JSON.stringify([group,index,e.data||'',e.tema||'',e.anfitriao||'',e.obs||'',e.tarefas||{}]);
+        e.id='meet_'+stableHash(basis);
+        changed=true;
+      }
+    });
+  });
+  return changed;
+}
+
 function loadData(){
   const raw = localStorage.getItem(STORAGE_KEY);
-  if(!raw){ const fresh=syncOfficialCalendar(JSON.parse(JSON.stringify(seedData))); saveData(fresh); return fresh; }
-  try{ const parsed=syncOfficialCalendar(JSON.parse(raw)); saveData(parsed); return parsed; }
-  catch(e){ console.error('Erro lendo dados salvos, recarregando modelo inicial.', e); const fresh=syncOfficialCalendar(JSON.parse(JSON.stringify(seedData))); saveData(fresh); return fresh; }
+  if(!raw){ const fresh=syncOfficialCalendar(JSON.parse(JSON.stringify(seedData))); ensureMeetingIds(fresh); saveData(fresh); return fresh; }
+  try{ const parsed=syncOfficialCalendar(JSON.parse(raw)); ensureMeetingIds(parsed); saveData(parsed); return parsed; }
+  catch(e){ console.error('Erro lendo dados salvos, recarregando modelo inicial.', e); const fresh=syncOfficialCalendar(JSON.parse(JSON.stringify(seedData))); ensureMeetingIds(fresh); saveData(fresh); return fresh; }
 }
 function saveData(data){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -384,6 +405,7 @@ let DATA = loadData();
 window.getPlannerData = ()=> DATA;
 window.applyPlannerCloudData = (incoming)=>{
   DATA = syncOfficialCalendar(JSON.parse(JSON.stringify(incoming || seedData)));
+  ensureMeetingIds(DATA);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA));
   render();
 };
@@ -570,6 +592,7 @@ function renderPessoas(key){
 }
 
 function renderEncontros(key){
+  ensureMeetingIds(DATA);
   const g = DATA[key];
   const ordenados = encontrosEfetivos(key).sort((a,b)=> (a.data||'').localeCompare(b.data||''));
   return `
@@ -820,9 +843,10 @@ function handleAction(ds){
     case 'baixar-foto': { const p=DATA[grupo].pessoas.find(x=>x.id===ds.id); if(p?.foto) baixarDataUrl(p.foto, `${nomeArquivoSeguro(p.nome)}-avatar.jpg`); break; }
     case 'excluir-pessoa': if(confirm('Excluir esta pessoa?')){ DATA[grupo].pessoas = DATA[grupo].pessoas.filter(x=>x.id!==ds.id); saveData(DATA); render(); } break;
 
-    case 'novo-encontro': openModal('Nova reunião', encontroFields(), {}, (v)=>{ DATA[grupo].encontros.push(formatEncontro(v)); saveData(DATA); render(); }); break;
+    case 'novo-encontro': openModal('Nova reunião', encontroFields(), {}, (v)=>{ DATA[grupo].encontros.push({id:uid(),...formatEncontro(v)}); saveData(DATA); render(); }); break;
     case 'editar-encontro': {
-      const e = DATA[grupo]?.encontros?.find(x=>x.id===ds.id);
+      ensureMeetingIds(DATA);
+      const e = DATA[grupo]?.encontros?.find(x=>String(x.id)===String(ds.id));
       if(!e){ alert('Não encontrei esta reunião para editar. Atualize a página e tente novamente.'); break; }
       openModal('Editar reunião', encontroFields(), flattenEncontro(e), (v)=>{
         const atualizado=formatEncontro(v);
@@ -833,10 +857,11 @@ function handleAction(ds){
       break;
     }
     case 'excluir-encontro': {
+      ensureMeetingIds(DATA);
       const lista=DATA[grupo]?.encontros||[];
-      if(!lista.some(x=>x.id===ds.id)){ alert('Não encontrei esta reunião para excluir. Atualize a página e tente novamente.'); break; }
+      if(!lista.some(x=>String(x.id)===String(ds.id))){ alert('Não encontrei esta reunião para excluir. Atualize a página e tente novamente.'); break; }
       if(confirm('Excluir esta reunião?')){
-        DATA[grupo].encontros = lista.filter(x=>x.id!==ds.id);
+        DATA[grupo].encontros = lista.filter(x=>String(x.id)!==String(ds.id));
         saveData(DATA);
         render();
       }
