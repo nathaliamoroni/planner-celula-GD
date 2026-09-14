@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planner Célula e GD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F5F6F1;
+    --surface:#FFFFFF;
+    --ink:#11130D;
+    --ink-soft:#626659;
+    --line:#E1E5D9;
+    --line-strong:#C7CEBB;
+    --celula:#78B800;
+    --celula-soft:#E9F5D0;
+    --jovens:#B5652B;
+    --jovens-soft:#F3E1D1;
+    --adultos:#3F5B6C;
+    --adultos-soft:#DCE6EA;
+    --pessoal:#8B5A7C;
+    --pessoal-soft:#EEE1EC;
+    --painel:#78B800;
+    --danger:#A5432E;
+    --danger-soft:#F3DCD6;
+    --radius:10px;
+    --shadow:0 1px 2px rgba(35,38,28,.06), 0 6px 16px rgba(35,38,28,.05);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);}
+  h1,h2,h3,.display{font-family:'Fraunces',serif;}
+  button{font-family:inherit;cursor:pointer;}
+  input,select,textarea{font-family:inherit;font-size:14px;}
+
+  /* ---------- layout ---------- */
+  .shell{display:flex;min-height:100vh;}
+  .sidebar{
+    width:236px;flex-shrink:0;background:#090A08;color:#F4F5EF;
+    display:flex;flex-direction:column;padding:24px 16px;position:sticky;top:0;height:100vh;
+  }
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:28px;padding:0 8px;}
+  .brand-mark{width:34px;height:34px;border-radius:50%;background:var(--celula);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:600;color:#fff;font-size:15px;}
+  .brand-text .name{font-family:'Fraunces',serif;font-size:17px;font-weight:600;line-height:1.1;}
+  .brand-text .sub{font-size:11px;color:#B7B6A5;letter-spacing:.02em;}
+  nav.navlist{display:flex;flex-direction:column;gap:2px;flex:1;}
+  .navlist button{
+    all:unset;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;
+    font-size:14px;color:#D9D8C8;cursor:pointer;transition:background .15s;
+  }
+  .navlist button:hover{background:rgba(255,255,255,.06);}
+  .navlist button.active{background:rgba(255,255,255,.12);color:#fff;font-weight:600;}
+  .navlist .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .sidebar-footer{padding-top:16px;border-top:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;gap:8px;}
+  .ghost-btn{background:transparent;border:1px solid rgba(255,255,255,.18);color:#D9D8C8;border-radius:8px;padding:8px 10px;font-size:12.5px;text-align:left;}
+  .ghost-btn:hover{border-color:rgba(255,255,255,.4);}
+
+  .topbar{display:none;position:sticky;top:0;z-index:20;background:#090A08;color:#fff;padding:14px 16px;align-items:center;justify-content:space-between;}
+  .topbar button{background:transparent;border:none;color:#fff;font-size:20px;}
+
+  main{flex:1;min-width:0;padding:36px 40px 80px;}
+  .view-head{margin-bottom:22px;}
+  .view-head .eyebrow{color:var(--theme,var(--celula));font-size:12.5px;font-weight:600;margin-bottom:2px;}
+  .view-head h1{margin:0;font-size:28px;font-weight:600;}
+  .view-head p{margin:6px 0 0;color:var(--ink-soft);font-size:14px;max-width:60ch;}
+
+  .banner{background:#FBF3D9;border:1px solid #E9D89A;border-radius:var(--radius);padding:12px 16px;font-size:13px;color:#5C4A17;margin-bottom:22px;display:flex;gap:10px;align-items:flex-start;}
+  .banner b{font-weight:600;}
+
+  .tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--line);}
+  .tabs button{all:unset;padding:9px 4px;margin-right:20px;font-size:13.5px;color:var(--ink-soft);border-bottom:2px solid transparent;cursor:pointer;}
+  .tabs button.active{color:var(--ink);border-bottom-color:var(--theme,var(--celula));font-weight:600;}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 18px;box-shadow:var(--shadow);}
+  .card h3{margin:0 0 4px;font-size:14px;text-transform:none;color:var(--ink-soft);font-weight:600;}
+  .card .big{font-family:'Fraunces',serif;font-size:20px;font-weight:600;margin:4px 0 2px;}
+  .card .meta{font-size:12.5px;color:var(--ink-soft);}
+
+  .section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap;}
+  .section-head h2{margin:0;font-size:16px;font-weight:600;}
+  .btn{border:1px solid var(--line-strong);background:var(--surface);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:500;color:var(--ink);}
+  .btn:hover{border-color:var(--ink-soft);}
+  .btn.primary{background:var(--theme,var(--celula));border-color:var(--theme,var(--celula));color:#fff;}
+  .btn.primary:hover{filter:brightness(1.07);}
+  .btn.small{padding:5px 10px;font-size:12px;}
+  .btn.danger{color:var(--danger);border-color:var(--danger-soft);}
+  .btn.danger:hover{background:var(--danger-soft);}
+  .icon-btn{all:unset;cursor:pointer;color:var(--ink-soft);padding:4px 6px;border-radius:6px;font-size:13px;}
+  .icon-btn:hover{background:var(--line);color:var(--ink);}
+
+  .list{display:flex;flex-direction:column;gap:8px;}
+  .row{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:13px 16px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+  .row .info{min-width:0;}
+  .row .title{font-weight:600;font-size:14.5px;}
+  .row .sub{font-size:12.5px;color:var(--ink-soft);margin-top:2px;line-height:1.5;}
+  .row .actions{display:flex;gap:4px;flex-shrink:0;align-items:center;flex-wrap:wrap;justify-content:flex-end;}
+  .person-main{display:flex;align-items:center;gap:12px;min-width:0;flex:1;}
+  .avatar{width:50px;height:50px;border-radius:50%;object-fit:cover;flex:0 0 50px;border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line-strong);background:var(--celula-soft);}
+  .avatar-placeholder{width:50px;height:50px;border-radius:50%;flex:0 0 50px;display:flex;align-items:center;justify-content:center;background:var(--celula-soft);color:var(--celula);font-weight:800;font-size:14px;border:1px solid var(--line-strong);text-transform:uppercase;}
+  .photo-field{border:1px solid var(--line);border-radius:10px;padding:12px;background:#FEFDF9;}
+  .photo-preview-wrap{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+  .photo-preview{width:78px;height:78px;border-radius:50%;object-fit:cover;border:1px solid var(--line-strong);background:var(--celula-soft);}
+  .photo-preview.empty{display:flex;align-items:center;justify-content:center;color:var(--ink-soft);font-size:11px;text-align:center;padding:8px;}
+  .photo-actions{display:flex;gap:7px;flex-wrap:wrap;}
+  .photo-help{font-size:11.5px;color:var(--ink-soft);line-height:1.45;margin-top:8px;}
+  .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:99px;background:var(--theme-soft,var(--celula-soft));color:var(--theme,var(--celula));font-weight:600;margin-right:6px;}
+  .empty{border:1px dashed var(--line-strong);border-radius:var(--radius);padding:28px 20px;text-align:center;color:var(--ink-soft);font-size:13.5px;}
+
+  .checklist-item{display:flex;align-items:flex-start;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:11px 14px;}
+  .checklist-item input[type=checkbox]{margin-top:2px;width:16px;height:16px;accent-color:var(--theme,var(--celula));}
+  .checklist-item.done .txt{color:var(--ink-soft);text-decoration:line-through;}
+  .checklist-item .txt{flex:1;font-size:13.5px;line-height:1.5;}
+
+  /* modal */
+  .overlay{position:fixed;inset:0;background:rgba(20,20,14,.4);display:none;align-items:flex-start;justify-content:center;padding:6vh 16px;z-index:50;overflow:auto;}
+  .overlay.open{display:flex;}
+  .modal{background:var(--surface);border-radius:14px;padding:26px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+  .modal h3{margin:0 0 16px;font-size:17px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-soft);margin-bottom:5px;}
+  .field input,.field select,.field textarea{width:100%;border:1px solid var(--line-strong);border-radius:8px;padding:9px 11px;background:#FEFDF9;}
+  .field textarea{resize:vertical;min-height:64px;}
+  .field-row{display:flex;gap:10px;}
+  .field-row .field{flex:1;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;}
+  .field label.chk{display:flex;align-items:center;gap:8px;font-weight:500;color:var(--ink);}
+
+  textarea.notes{width:100%;min-height:180px;border:1px solid var(--line);border-radius:var(--radius);padding:14px;background:var(--surface);font-size:14px;line-height:1.6;}
+
+  /* ---------- visual Peregrinos + drag & drop ---------- */
+  body::before{content:'';position:fixed;inset:0 auto auto 236px;width:120px;height:18px;background:linear-gradient(135deg,transparent 12px,var(--paper) 13px) 0 0/24px 18px repeat-x;opacity:.9;pointer-events:none;z-index:2;}
+  .brand-mark{background:var(--celula);color:#0A0A08;font-weight:800;}
+  .btn.primary{color:#111;background:var(--celula);border-color:var(--celula);font-weight:700;}
+  .view-head h1{font-size:32px;letter-spacing:-.02em;}
+  .card,.row,.checklist-item{transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;}
+  .draggable{cursor:grab;}
+  .draggable:active{cursor:grabbing;}
+  .dragging{opacity:.45;transform:scale(.985);}
+  .drag-over{border-color:var(--celula)!important;box-shadow:0 0 0 3px rgba(120,184,0,.15),var(--shadow)!important;}
+  .drag-handle{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;color:#969B8D;font-size:16px;line-height:1;user-select:none;margin-right:6px;}
+  .drag-handle:hover{background:var(--celula-soft);color:var(--celula);}
+  .freeboard{position:relative;min-height:760px;border:1px dashed var(--line-strong);border-radius:16px;background:rgba(255,255,255,.28);overflow:hidden;}
+  .dashboard-widget{position:absolute;width:min(340px,calc(100% - 24px));touch-action:none;user-select:none;}
+  .dashboard-widget .widget-card{height:100%;min-height:120px;}
+  .widget-card{position:relative;}
+  .widget-card .widget-drag{position:absolute;right:42px;top:11px;cursor:grab;}
+  .widget-card .widget-delete{position:absolute;right:12px;top:11px;width:24px;height:24px;border:0;background:transparent;color:#969B8D;border-radius:6px;font-size:16px;line-height:1;}
+  .widget-card .widget-delete:hover{background:var(--danger-soft);color:var(--danger);}
+  .dashboard-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  .dashboard-toolbar .hint-drag{margin:0;}
+  .freeboard-empty{padding:48px 20px;text-align:center;color:var(--ink-soft);}
+  @media (max-width:860px){
+    .freeboard{display:flex;flex-direction:column;gap:14px;min-height:0;border:0;background:transparent;overflow:visible;}
+    .dashboard-widget{position:relative!important;left:auto!important;top:auto!important;width:100%!important;}
+    .widget-card .widget-drag{display:none;}
+  }
+  .info-strip{background:#0A0A08;color:#fff;border-radius:16px;padding:22px;margin-bottom:22px;position:relative;overflow:hidden;}
+  .info-strip::after{content:'P';position:absolute;right:18px;bottom:-30px;font-family:'Fraunces',serif;font-size:110px;font-weight:700;color:rgba(120,184,0,.18);transform:rotate(-8deg);}
+  .info-strip .eyebrow{color:#9BDD20;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;}
+  .info-strip h2{margin:4px 0 8px;font-size:27px;color:#fff;}
+  .info-strip p{margin:3px 0;color:#D7DBCF;font-size:13.5px;}
+  .info-strip .btn{margin-top:12px;border-color:#47503D;background:#151812;color:#fff;position:relative;z-index:1;}
+  .info-strip .btn:hover{border-color:#8CCB20;}
+  .role-pill{display:inline-block;font-size:10.5px;padding:3px 8px;border-radius:999px;background:#111;color:#fff;font-weight:700;margin-left:6px;vertical-align:1px;}
+  .role-pill[data-role="Líder"]{background:var(--celula);color:#111;}
+  .role-pill[data-role="Auxiliar"]{background:#D8ECAB;color:#33470A;}
+  .role-pill[data-role="Anfitrião(ã)"]{background:#F0DFC4;color:#6B4418;}
+  .hint-drag{font-size:11.5px;color:var(--ink-soft);margin:-6px 0 12px;display:flex;align-items:center;gap:5px;}
+  @media (max-width:860px){body::before{display:none}.view-head h1{font-size:28px}.info-strip{border-radius:12px}}
+  @media (max-width:860px){
+    .sidebar{display:none;}
+    .topbar{display:flex;}
+    main{padding:22px 16px 70px;}
+    .shell.nav-open .sidebar{display:flex;position:fixed;z-index:30;height:100vh;}
+  }
+
+
+  /* ---------- visual app: verde suave + cartões arredondados ---------- */
+  :root{
+    --paper:#F2F6F0;
+    --surface:#FFFFFF;
+    --ink:#162019;
+    --ink-soft:#6B756D;
+    --line:#E4ECE5;
+    --line-strong:#CFDCCF;
+    --celula:#56C781;
+    --celula-soft:#E4F7EA;
+    --jovens:#57BFA9;
+    --jovens-soft:#DFF5F0;
+    --adultos:#6AA7A0;
+    --adultos-soft:#E0F0EE;
+    --pessoal:#7BBF86;
+    --pessoal-soft:#E7F4E9;
+    --painel:#56C781;
+    --danger:#CE6258;
+    --danger-soft:#FBE7E4;
+    --radius:20px;
+    --shadow:0 10px 28px rgba(45,88,57,.08),0 2px 8px rgba(45,88,57,.05);
+  }
+  body{background:linear-gradient(180deg,#F8FAF5 0%,#EEF5EF 100%);}
+  .sidebar{
+    background:linear-gradient(180deg,#49C982 0%,#62D09A 52%,#3BB876 100%);
+    color:#fff;box-shadow:10px 0 34px rgba(31,112,67,.12);border-right:1px solid rgba(255,255,255,.28);
+  }
+  .brand{padding:4px 8px 18px;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,.22);}
+  .brand-mark{background:rgba(255,255,255,.95);color:#36A867;box-shadow:0 6px 16px rgba(25,95,56,.15);}
+  .brand-text .name{color:#fff;font-family:'Inter',sans-serif;font-weight:800;}
+  .brand-text .sub{color:rgba(255,255,255,.78);}
+  .navlist button{color:rgba(255,255,255,.88);border-radius:14px;padding:11px 12px;font-weight:600;}
+  .navlist button:hover{background:rgba(255,255,255,.14);}
+  .navlist button.active{background:#fff;color:#239B5B;box-shadow:0 7px 18px rgba(30,104,61,.16);}
+  .navlist .dot{box-shadow:0 0 0 2px rgba(255,255,255,.35);}
+  .navlist button.active .dot{box-shadow:none;}
+  .sidebar-footer{border-top:1px solid rgba(255,255,255,.22);}
+  .ghost-btn{border-color:rgba(255,255,255,.34);color:#fff;background:rgba(255,255,255,.08);border-radius:12px;}
+  .ghost-btn:hover{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.6);}
+  main{background:transparent;}
+  body::before{display:none;}
+  .view-head{padding:5px 2px 2px;}
+  .view-head .eyebrow{font-weight:800;letter-spacing:.01em;}
+  .view-head h1{font-family:'Inter',sans-serif;font-size:30px;font-weight:800;letter-spacing:-.035em;color:#152019;}
+  .view-head p{font-size:13.5px;}
+  .card,.row,.checklist-item,.modal,textarea.notes,.photo-field{
+    border-color:var(--line);border-radius:20px;box-shadow:var(--shadow);
+  }
+  .card{padding:19px;background:linear-gradient(145deg,#FFFFFF 0%,#FCFFFC 100%);}
+  .card h3{font-family:'Inter',sans-serif;color:#718078;font-size:12px;font-weight:800;letter-spacing:.025em;text-transform:uppercase;}
+  .card .big{font-family:'Inter',sans-serif;font-weight:800;color:#1A2820;letter-spacing:-.03em;}
+  .row{box-shadow:none;background:#FAFCFA;border-radius:15px;}
+  .btn{border-radius:999px;padding:8px 15px;background:#fff;box-shadow:0 3px 9px rgba(42,93,58,.05);}
+  .btn.primary{background:linear-gradient(135deg,#63D58F,#42BF78);border-color:transparent;color:#fff;box-shadow:0 7px 16px rgba(53,185,111,.2);}
+  .btn.primary:hover{filter:brightness(1.03);transform:translateY(-1px);}
+  .icon-btn{border-radius:999px;padding:5px 9px;}
+  .tabs{gap:7px;border-bottom:0;background:#E8F0E9;padding:5px;border-radius:999px;width:max-content;max-width:100%;overflow-x:auto;}
+  .tabs button{margin:0;padding:8px 14px;border:0;border-radius:999px;white-space:nowrap;}
+  .tabs button.active{background:#fff;color:var(--theme,var(--celula));box-shadow:0 5px 13px rgba(47,103,65,.09);border:0;}
+  .freeboard{border:0;background:transparent;border-radius:24px;overflow:hidden;}
+  .dashboard-widget .widget-card{border:0;box-shadow:0 12px 30px rgba(45,88,57,.09);}
+  .widget-card::before{content:'';position:absolute;left:0;top:0;width:100%;height:5px;border-radius:20px 20px 0 0;background:linear-gradient(90deg,#50C77F,#A9E968);opacity:.9;}
+  .widget-card .widget-drag,.widget-card .widget-delete{color:#98A69C;}
+  .widget-card .widget-delete:hover{background:#FFF1EF;}
+  .info-strip{background:linear-gradient(135deg,#3DBE76,#65D39A);box-shadow:0 14px 34px rgba(45,168,99,.19);border-radius:22px;}
+  .info-strip::after{color:rgba(255,255,255,.12);}
+  .info-strip .eyebrow{color:#E8FF9F;}
+  .info-strip p{color:rgba(255,255,255,.9);}
+  .info-strip .btn{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.28);}
+  .pill{border-radius:999px;padding:4px 9px;}
+  .checklist-item input[type=checkbox]{accent-color:#49C77D;}
+  .overlay{backdrop-filter:blur(7px);background:rgba(26,52,35,.28);}
+  .modal{border:1px solid rgba(255,255,255,.7);}
+  .field input,.field select,.field textarea{border-radius:13px;background:#F8FBF8;border-color:#DCE7DD;}
+  .topbar{background:linear-gradient(135deg,#42BF78,#68D49A);box-shadow:0 8px 22px rgba(44,151,89,.16);}
+  .personal-area-badge{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 8px;background:var(--pessoal-soft);color:#478A55;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;}
+  .due-soon{color:#B46A28!important;font-weight:700;}
+  .due-overdue{color:#B44E46!important;font-weight:700;}
+  @media (max-width:860px){
+    .view-head h1{font-size:27px}.tabs{width:100%}.card,.row,.checklist-item{border-radius:17px}.freeboard{border-radius:0}
+  }
+
+</style>
+</head>
+<body>
+
+<div class="shell" id="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">P</div>
+      <div class="brand-text">
+        <div class="name">Planner Célula e GD</div>
+        <div class="sub">Célula Peregrinos</div>
+      </div>
+    </div>
+    <nav class="navlist" id="navlist"></nav>
+    <div class="sidebar-footer">
+      <button class="ghost-btn" id="btn-export">⭳ Exportar dados (backup)</button>
+      <button class="ghost-btn" id="btn-import">⭱ Importar backup</button>
+      <input type="file" id="import-file" accept="application/json" style="display:none">
+    </div>
+  </aside>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+    <div class="topbar">
+      <button id="menu-toggle">☰</button>
+      <div class="brand-text" style="text-align:center;"><div class="name" style="font-size:15px;">Planner Célula e GD</div></div>
+      <div style="width:20px;"></div>
+    </div>
+    <main id="app"></main>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script>
+/* =========================================================
+   DADOS — hoje salvos neste navegador (localStorage).
+   As funções loadData()/saveData() são o único ponto de
+   contato com a persistência: quando o Firebase entrar,
+   só isso muda — o resto do app continua igual.
+========================================================= */
+const STORAGE_KEY = 'celulaGdPlannerData_v2';
+
+function uid(){ return 'id_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+/* ---------- agenda oficial PIB Botafogo (14/09 a 31/12/2026) ---------- */
+const OFFICIAL_CALENDAR_EVENTS = [{"data":"2026-09-14","titulo":"15:00 - Oração e Comunhão","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-14|15:00 - Oração e Comunhão"},{"data":"2026-09-16","titulo":"20:00 - Quarta do Encontro","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-16|20:00 - Quarta do Encontro"},{"data":"2026-09-17","titulo":"Células (Minha Célula em Missão)","categoria":"Missões","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-17|Células (Minha Célula em Missão)"},{"data":"2026-09-17","titulo":"Celulão GD Janete em pares (Com. Mob.: Homens e Mulheres)","categoria":"Homens / Mulheres","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-17|Celulão GD Janete em pares (Com. Mob.: Homens e Mulheres)"},{"data":"2026-09-18","titulo":"Células (Minha Célula em Missão)","categoria":"Missões","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-18|Células (Minha Célula em Missão)"},{"data":"2026-09-19","titulo":"Casa Acolhedora","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-19|Casa Acolhedora"},{"data":"2026-09-19","titulo":"17:00 - Recital de Música","categoria":"Comissão Eventos Especiais","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-19|17:00 - Recital de Música"},{"data":"2026-09-20","titulo":"09:00 - EBD","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-20|09:00 - EBD"},{"data":"2026-09-20","titulo":"10:30 - Culto da Manhã (Set. Amarelo)","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-20|10:30 - Culto da Manhã (Set. Amarelo)"},{"data":"2026-09-20","titulo":"Reunião GD Léo - Adultos","categoria":"GD Adultos","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-20|Reunião GD Léo - Adultos"},{"data":"2026-09-20","titulo":"18:30 - Culto da Noite (Set. Amarelo)","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-20|18:30 - Culto da Noite (Set. Amarelo)"},{"data":"2026-09-21","titulo":"15:00 - Oração e Comunhão","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-21|15:00 - Oração e Comunhão"},{"data":"2026-09-23","titulo":"20:00 - Quarta do Encontro (Assembleia)","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-23|20:00 - Quarta do Encontro (Assembleia)"},{"data":"2026-09-24","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-24|Células"},{"data":"2026-09-25","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-25|Células"},{"data":"2026-09-25","titulo":"Vigília de Oração (Missões)","categoria":"Missões","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-25|Vigília de Oração (Missões)"},{"data":"2026-09-26","titulo":"Casa Acolhedora","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-26|Casa Acolhedora"},{"data":"2026-09-26","titulo":"Eu e Minha Célula","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-26|Eu e Minha Célula"},{"data":"2026-09-27","titulo":"09:00 - EBD","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-27|09:00 - EBD"},{"data":"2026-09-27","titulo":"10:30 - Culto da Manhã","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-27|10:30 - Culto da Manhã"},{"data":"2026-09-27","titulo":"18:30 - Culto da Noite (Festa da Multiplicação)","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-27|18:30 - Culto da Noite (Festa da Multiplicação)"},{"data":"2026-09-28","titulo":"15:00 - Oração e Comunhão","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-28|15:00 - Oração e Comunhão"},{"data":"2026-09-30","titulo":"20:00 - Quarta do Encontro","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-09-30|20:00 - Quarta do Encontro"},{"data":"2026-10-01","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-01|Células"},{"data":"2026-10-02","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-02|Células"},{"data":"2026-10-02","titulo":"Celulão GD Léo-Jovens (Com. Mob.: Juventude)","categoria":"GD Jovens","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-02|Celulão GD Léo-Jovens (Com. Mob.: Juventude)"},{"data":"2026-10-03","titulo":"Casa Acolhedora","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-03|Casa Acolhedora"},{"data":"2026-10-03","titulo":"08:30 - Café de Pastores e Seminaristas","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-03|08:30 - Café de Pastores e Seminaristas"},{"data":"2026-10-03","titulo":"Culto de Líderes","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-03|Culto de Líderes"},{"data":"2026-10-04","titulo":"09:00 - EBD","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-04|09:00 - EBD"},{"data":"2026-10-04","titulo":"10:30 - Culto da Manhã (ceia)","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-04|10:30 - Culto da Manhã (ceia)"},{"data":"2026-10-04","titulo":"Reunião GD Léo - Jovens","categoria":"GD Jovens","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-04|Reunião GD Léo - Jovens"},{"data":"2026-10-04","titulo":"18:30 - Culto da Noite (ceia)","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-04|18:30 - Culto da Noite (ceia)"},{"data":"2026-10-05","titulo":"15:00 - Oração e Comunhão","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-05|15:00 - Oração e Comunhão"},{"data":"2026-10-07","titulo":"20:00 - Quarta do Encontro","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-07|20:00 - Quarta do Encontro"},{"data":"2026-10-08","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-08|Células"},{"data":"2026-10-09","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-09|Células"},{"data":"2026-10-09","titulo":"Acampadentro Semear","categoria":"Crianças","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-09|Acampadentro Semear"},{"data":"2026-10-10","titulo":"Casa Acolhedora","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-10|Casa Acolhedora"},{"data":"2026-10-10","titulo":"Acampadentro Semear","categoria":"Crianças","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-10|Acampadentro Semear"},{"data":"2026-10-11","titulo":"09:00 - EBD","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-11|09:00 - EBD"},{"data":"2026-10-11","titulo":"10:30 - Culto da Manhã (Semear)","categoria":"Crianças","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-11|10:30 - Culto da Manhã (Semear)"},{"data":"2026-10-11","titulo":"Reunião GD Janete","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-11|Reunião GD Janete"},{"data":"2026-10-11","titulo":"18:30 - Culto da Noite","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-11|18:30 - Culto da Noite"},{"data":"2026-10-12","titulo":"15:00 - Oração e Comunhão","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-12|15:00 - Oração e Comunhão"},{"data":"2026-10-14","titulo":"20:00 - Quarta do Encontro","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-14|20:00 - Quarta do Encontro"},{"data":"2026-10-15","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-15|Células"},{"data":"2026-10-16","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-16|Células"},{"data":"2026-10-17","titulo":"Casa Acolhedora","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-17|Casa Acolhedora"},{"data":"2026-10-17","titulo":"Atividade de Missões","categoria":"Missões","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-17|Atividade de Missões"},{"data":"2026-10-18","titulo":"09:00 - EBD","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-18|09:00 - EBD"},{"data":"2026-10-18","titulo":"10:30 - Culto da Manhã + Encerramento MN","categoria":"Missões","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-18|10:30 - Culto da Manhã + Encerramento MN"},{"data":"2026-10-18","titulo":"Reunião GD Léo - Adultos","categoria":"GD Adultos","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-18|Reunião GD Léo - Adultos"},{"data":"2026-10-18","titulo":"18:30 - Culto da Noite","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-18|18:30 - Culto da Noite"},{"data":"2026-10-19","titulo":"15:00 - Oração e Comunhão","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-19|15:00 - Oração e Comunhão"},{"data":"2026-10-21","titulo":"20:00 - Quarta do Encontro","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-21|20:00 - Quarta do Encontro"},{"data":"2026-10-22","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-22|Células"},{"data":"2026-10-23","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-23|Células"},{"data":"2026-10-24","titulo":"Casa Acolhedora","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-24|Casa Acolhedora"},{"data":"2026-10-24","titulo":"17:00 - Culto Teens","categoria":"Adolescentes","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-24|17:00 - Culto Teens"},{"data":"2026-10-24","titulo":"Congresso Educação Parental Cristã","categoria":"Crianças","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-24|Congresso Educação Parental Cristã"},{"data":"2026-10-25","titulo":"09:00 - EBD","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-25|09:00 - EBD"},{"data":"2026-10-25","titulo":"10:30 - Culto da Manhã (Cong. Educ. Parental Cristã)","categoria":"Crianças","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-25|10:30 - Culto da Manhã (Cong. Educ. Parental Cristã)"},{"data":"2026-10-25","titulo":"18:30 - Culto da Noite","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-25|18:30 - Culto da Noite"},{"data":"2026-10-26","titulo":"15:00 - Oração e Comunhão","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-26|15:00 - Oração e Comunhão"},{"data":"2026-10-28","titulo":"20:00 - Quarta do Encontro (Assembleia)","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-28|20:00 - Quarta do Encontro (Assembleia)"},{"data":"2026-10-29","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-29|Células"},{"data":"2026-10-30","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-30|Células"},{"data":"2026-10-30","titulo":"Vigília de Oração (Ação Social)","categoria":"Ação Social","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-30|Vigília de Oração (Ação Social)"},{"data":"2026-10-31","titulo":"Casa Acolhedora","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-10-31|Casa Acolhedora"},{"data":"2026-11-01","titulo":"09:00 - EBD","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-01|09:00 - EBD"},{"data":"2026-11-01","titulo":"10:30 - Culto da Manhã (ceia)","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-01|10:30 - Culto da Manhã (ceia)"},{"data":"2026-11-01","titulo":"18:30 - Culto da Noite (ceia)","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-01|18:30 - Culto da Noite (ceia)"},{"data":"2026-11-02","titulo":"15:00 - Oração e Comunhão","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-02|15:00 - Oração e Comunhão"},{"data":"2026-11-04","titulo":"20:00 - Quarta do Encontro","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-04|20:00 - Quarta do Encontro"},{"data":"2026-11-05","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-05|Células"},{"data":"2026-11-06","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-06|Células"},{"data":"2026-11-07","titulo":"Casa Acolhedora","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-07|Casa Acolhedora"},{"data":"2026-11-07","titulo":"08:30 - Café de Pastores e Seminaristas","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-07|08:30 - Café de Pastores e Seminaristas"},{"data":"2026-11-07","titulo":"Aniversário PIBB","categoria":"Comissão Eventos Especiais","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-07|Aniversário PIBB"},{"data":"2026-11-08","titulo":"09:00 - EBD","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-08|09:00 - EBD"},{"data":"2026-11-08","titulo":"10:30 - Culto da Manhã (Aniversário PIBB)","categoria":"Comissão Eventos Especiais","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-08|10:30 - Culto da Manhã (Aniversário PIBB)"},{"data":"2026-11-08","titulo":"Reunião GD Léo - Jovens","categoria":"GD Jovens","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-08|Reunião GD Léo - Jovens"},{"data":"2026-11-08","titulo":"18:30 - Culto da Noite (Aniversário PIBB)","categoria":"Comissão Eventos Especiais","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-08|18:30 - Culto da Noite (Aniversário PIBB)"},{"data":"2026-11-09","titulo":"15:00 - Oração e Comunhão","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-09|15:00 - Oração e Comunhão"},{"data":"2026-11-11","titulo":"20:00 - Quarta do Encontro","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-11|20:00 - Quarta do Encontro"},{"data":"2026-11-12","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-12|Células"},{"data":"2026-11-12","titulo":"Celulão GD Janete (Com. Mob.: Terceira Idade)","categoria":"Terceira Idade","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-12|Celulão GD Janete (Com. Mob.: Terceira Idade)"},{"data":"2026-11-13","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-13|Células"},{"data":"2026-11-13","titulo":"Celulão GD Léo em pares (Com. Mob.: Homens e Mulheres)","categoria":"GD Adultos","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-13|Celulão GD Léo em pares (Com. Mob.: Homens e Mulheres)"},{"data":"2026-11-14","titulo":"Casa Acolhedora","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-14|Casa Acolhedora"},{"data":"2026-11-15","titulo":"09:00 - EBD","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-15|09:00 - EBD"},{"data":"2026-11-15","titulo":"10:30 - Culto da Manhã (Formatura Escola de Líderes)","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-15|10:30 - Culto da Manhã (Formatura Escola de Líderes)"},{"data":"2026-11-15","titulo":"Reunião GD Janete","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-15|Reunião GD Janete"},{"data":"2026-11-15","titulo":"Reunião GD Léo - Adultos","categoria":"GD Adultos","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-15|Reunião GD Léo - Adultos"},{"data":"2026-11-15","titulo":"18:30 - Culto da Noite","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-15|18:30 - Culto da Noite"},{"data":"2026-11-16","titulo":"15:00 - Oração e Comunhão","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-16|15:00 - Oração e Comunhão"},{"data":"2026-11-18","titulo":"20:00 - Quarta do Encontro","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-18|20:00 - Quarta do Encontro"},{"data":"2026-11-19","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-19|Células"},{"data":"2026-11-20","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-20|Células"},{"data":"2026-11-21","titulo":"Casa Acolhedora","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-21|Casa Acolhedora"},{"data":"2026-11-21","titulo":"17:00 - Culto Teens","categoria":"Adolescentes","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-21|17:00 - Culto Teens"},{"data":"2026-11-22","titulo":"09:00 - EBD","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-22|09:00 - EBD"},{"data":"2026-11-22","titulo":"10:30 - Culto da Manhã","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-22|10:30 - Culto da Manhã"},{"data":"2026-11-22","titulo":"18:30 - Culto da Noite","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-22|18:30 - Culto da Noite"},{"data":"2026-11-23","titulo":"15:00 - Oração e Comunhão","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-23|15:00 - Oração e Comunhão"},{"data":"2026-11-25","titulo":"20:00 - Quarta do Encontro (Assembleia)","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-25|20:00 - Quarta do Encontro (Assembleia)"},{"data":"2026-11-26","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-26|Células"},{"data":"2026-11-27","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-27|Células"},{"data":"2026-11-27","titulo":"Vigília de Oração (louvor)","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-27|Vigília de Oração (louvor)"},{"data":"2026-11-28","titulo":"Casa Acolhedora","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-28|Casa Acolhedora"},{"data":"2026-11-28","titulo":"Eu e minha célula","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-28|Eu e minha célula"},{"data":"2026-11-29","titulo":"09:00 - EBD","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-29|09:00 - EBD"},{"data":"2026-11-29","titulo":"10:30 - Culto da Manhã (profissão de fé)","categoria":"Comissão Eventos Especiais","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-29|10:30 - Culto da Manhã (profissão de fé)"},{"data":"2026-11-29","titulo":"18:30 - Culto da Noite (batismos)","categoria":"Comissão Eventos Especiais","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-29|18:30 - Culto da Noite (batismos)"},{"data":"2026-11-30","titulo":"15:00 - Oração e Comunhão","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-11-30|15:00 - Oração e Comunhão"},{"data":"2026-12-02","titulo":"20:00 - Quarta do Encontro","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-02|20:00 - Quarta do Encontro"},{"data":"2026-12-03","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-03|Células"},{"data":"2026-12-04","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-04|Células"},{"data":"2026-12-04","titulo":"Celulão GD Léo-Jovens (Com. Mob.: Juventude)","categoria":"GD Jovens","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-04|Celulão GD Léo-Jovens (Com. Mob.: Juventude)"},{"data":"2026-12-05","titulo":"Casa Acolhedora","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-05|Casa Acolhedora"},{"data":"2026-12-05","titulo":"08:30 - Café de Pastores e Seminaristas","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-05|08:30 - Café de Pastores e Seminaristas"},{"data":"2026-12-05","titulo":"Ensaio de Natal","categoria":"Comissão Eventos Especiais","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-05|Ensaio de Natal"},{"data":"2026-12-06","titulo":"09:00 - EBD","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-06|09:00 - EBD"},{"data":"2026-12-06","titulo":"10:30 - Culto da Manhã (ceia)","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-06|10:30 - Culto da Manhã (ceia)"},{"data":"2026-12-06","titulo":"18:30 - Culto da Noite (ceia)","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-06|18:30 - Culto da Noite (ceia)"},{"data":"2026-12-07","titulo":"15:00 - Oração e Comunhão","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-07|15:00 - Oração e Comunhão"},{"data":"2026-12-09","titulo":"20:00 - Quarta do Encontro","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-09|20:00 - Quarta do Encontro"},{"data":"2026-12-10","titulo":"Células","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-10|Células"},{"data":"2026-12-11","titulo":"Encerramento das Células de sexta","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-11|Encerramento das Células de sexta"},{"data":"2026-12-11","titulo":"Vigília de Oração Natalina","categoria":"Comissão Eventos Especiais","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-11|Vigília de Oração Natalina"},{"data":"2026-12-12","titulo":"Casa Acolhedora","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-12|Casa Acolhedora"},{"data":"2026-12-12","titulo":"Ensaio de Natal","categoria":"Comissão Eventos Especiais","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-12|Ensaio de Natal"},{"data":"2026-12-13","titulo":"09:00 - EBD (Encerramento das Classes)","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-13|09:00 - EBD (Encerramento das Classes)"},{"data":"2026-12-13","titulo":"10:30 - Culto da Manhã","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-13|10:30 - Culto da Manhã"},{"data":"2026-12-13","titulo":"18:30 - Culto da Noite","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-13|18:30 - Culto da Noite"},{"data":"2026-12-14","titulo":"15:00 - Oração e Comunhão","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-14|15:00 - Oração e Comunhão"},{"data":"2026-12-16","titulo":"20:00 - Quarta do Encontro","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-16|20:00 - Quarta do Encontro"},{"data":"2026-12-17","titulo":"Encerramento das Células de quinta","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-17|Encerramento das Células de quinta"},{"data":"2026-12-18","titulo":"Confraternização das Células na igreja","categoria":"Células","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-18|Confraternização das Células na igreja"},{"data":"2026-12-19","titulo":"Casa Acolhedora","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-19|Casa Acolhedora"},{"data":"2026-12-19","titulo":"Ensaio de Natal","categoria":"Comissão Eventos Especiais","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-19|Ensaio de Natal"},{"data":"2026-12-20","titulo":"09:00 - EBD","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-20|09:00 - EBD"},{"data":"2026-12-20","titulo":"10:30 - Culto Natalino (manhã)","categoria":"Comissão Eventos Especiais","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-20|10:30 - Culto Natalino (manhã)"},{"data":"2026-12-20","titulo":"18:30 - Musical de Natal (noite)","categoria":"Comissão Eventos Especiais","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-20|18:30 - Musical de Natal (noite)"},{"data":"2026-12-21","titulo":"15:00 - Oração e Comunhão","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-21|15:00 - Oração e Comunhão"},{"data":"2026-12-23","titulo":"20:00 - Quarta do Encontro (Assembleia)","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-23|20:00 - Quarta do Encontro (Assembleia)"},{"data":"2026-12-26","titulo":"Casa Acolhedora","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-26|Casa Acolhedora"},{"data":"2026-12-27","titulo":"09:00 - EBD","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-27|09:00 - EBD"},{"data":"2026-12-27","titulo":"10:30 - Culto da Manhã","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-27|10:30 - Culto da Manhã"},{"data":"2026-12-27","titulo":"18:30 - Culto da Noite","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-27|18:30 - Culto da Noite"},{"data":"2026-12-28","titulo":"15:00 - Oração e Comunhão","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-28|15:00 - Oração e Comunhão"},{"data":"2026-12-30","titulo":"20:00 - Quarta do Encontro","categoria":"PibBotafogo","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-30|20:00 - Quarta do Encontro"},{"data":"2026-12-31","titulo":"Culto da Virada","categoria":"Comissão Eventos Especiais","obs":"Agenda oficial da Igreja Batista de Botafogo","oficial":true,"chaveOficial":"2026-12-31|Culto da Virada"}];
+
+function normalizaTexto(s){
+  return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+}
+function syncOfficialCalendar(data){
+  data.calendario = Array.isArray(data.calendario) ? data.calendario : [];
+  data.calendarioOcultos = Array.isArray(data.calendarioOcultos) ? data.calendarioOcultos : [];
+  const ocultos = new Set(data.calendarioOcultos);
+  const oficiaisExistentes = new Set(data.calendario.filter(e=>e.chaveOficial).map(e=>e.chaveOficial));
+  OFFICIAL_CALENDAR_EVENTS.forEach((ev,idx)=>{
+    if(ocultos.has(ev.chaveOficial) || oficiaisExistentes.has(ev.chaveOficial)) return;
+    const nt=normalizaTexto(ev.titulo);
+    const dup=data.calendario.find(x=>x.data===ev.data && !x.chaveOficial && (()=>{ const nx=normalizaTexto(x.titulo); return nx && (nx===nt || nx.includes(nt) || nt.includes(nx)); })());
+    if(dup){ Object.assign(dup, ev, {id:dup.id||('oficial_'+idx)}); return; }
+    data.calendario.push({id:'oficial_'+idx,...ev});
+  });
+  return data;
+}
+
+function eventoEhDoGrupo(e,key){
+  const t=normalizaTexto(e?.titulo||e?.tema||'');
+  if(key==='gdJovens') return /gd leo jovens/.test(t) || /gd leo - jovens/.test((e?.titulo||'').toLowerCase());
+  if(key==='gdAdultos') return /gd leo adultos/.test(t) || /gd leo em pares/.test(t);
+  return false;
+}
+function encontrosEfetivos(key){
+  const manuais=(DATA[key]?.encontros||[]).map(e=>({...e,fonteCalendario:false}));
+  if(key!=='gdJovens' && key!=='gdAdultos') return manuais;
+  const vinculados=(DATA.calendario||[]).filter(e=>eventoEhDoGrupo(e,key)).map(e=>({
+    id:'cal_'+e.id, data:e.data, tema:e.titulo, anfitriao:'', tarefas:{},
+    obs:'Vinculado automaticamente ao Calendário da igreja', fonteCalendario:true, calendarEventId:e.id
+  }));
+  const vistos=new Set();
+  return [...manuais,...vinculados].filter(e=>{ const k=e.data+'|'+normalizaTexto(e.tema); if(vistos.has(k)) return false; vistos.add(k); return true; });
+}
+
+
+function grupoVazio(nome){
+  return { nome, pessoas: [], encontros: [], checklist: [] };
+}
+
+const seedData = {
+  celula: {
+    nome: 'Peregrinos',
+    versiculo: '',
+    endereco: '',
+    horario: '',
+    lideres: '',
+    pessoas: [],
+    encontros: [],
+    checklist: []
+  },
+  gdJovens: grupoVazio('GD Jovens'),
+  gdAdultos: grupoVazio('GD Adultos'),
+  calendario: [],
+  layout: { painel: ['celula','jovens','adultos','eventos','aniversarios','pessoalProximos','checkCelula','checkJovens','checkAdultos'], hiddenWidgets: [], positions: {} },
+  pessoal: {
+    tarefas: [],
+    notas: { familia: '', trabalho: '', estudo: '', pessoal: '' }
+  }
+};
+
+function loadData(){
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if(!raw){ const fresh=syncOfficialCalendar(JSON.parse(JSON.stringify(seedData))); saveData(fresh); return fresh; }
+  try{ const parsed=syncOfficialCalendar(JSON.parse(raw)); saveData(parsed); return parsed; }
+  catch(e){ console.error('Erro lendo dados salvos, recarregando modelo inicial.', e); const fresh=syncOfficialCalendar(JSON.parse(JSON.stringify(seedData))); saveData(fresh); return fresh; }
+}
+function saveData(data){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  if(window.queuePlannerCloudSave) window.queuePlannerCloudSave(data);
+}
+
+let DATA = loadData();
+window.getPlannerData = ()=> DATA;
+window.applyPlannerCloudData = (incoming)=>{
+  DATA = syncOfficialCalendar(JSON.parse(JSON.stringify(incoming || seedData)));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA));
+  render();
+};
+let VIEW = 'painel';
+let SUBTAB = { celula:'pessoas', gdJovens:'pessoas', gdAdultos:'pessoas', pessoal:'tarefas' };
+
+const CATEGORIAS_CAL = ['Células','GD Jovens','GD Adultos','Ação Social','Missões','Comissão Eventos Especiais','Mulheres','Homens','Homens / Mulheres','Terceira Idade','Crianças','Juventude','Juventude / Adolescentes','Adolescentes','PibBotafogo','Aniversário'];
+
+/* ---------- navegação ---------- */
+const NAV_ITEMS = [
+  { key:'painel', label:'Painel', color:'--painel' },
+  { key:'celula', label:'Célula Peregrinos', color:'--celula' },
+  { key:'gdJovens', label:'GD Jovens', color:'--jovens' },
+  { key:'gdAdultos', label:'GD Adultos', color:'--adultos' },
+  { key:'calendario', label:'Calendário da igreja', color:'--ink-soft' },
+  { key:'pessoal', label:'Vida pessoal', color:'--pessoal' }
+];
+
+function renderNav(){
+  const nav = document.getElementById('navlist');
+  nav.innerHTML = NAV_ITEMS.map(item => `
+    <button data-view="${item.key}" class="${VIEW===item.key?'active':''}">
+      <span class="dot" style="background:var(${item.color})"></span>${item.label}
+    </button>`).join('');
+  nav.querySelectorAll('button').forEach(b=>{
+    b.addEventListener('click', ()=>{ VIEW=b.dataset.view; document.getElementById('shell').classList.remove('nav-open'); render(); });
+  });
+}
+
+/* ---------- utilidades ---------- */
+function fmtData(iso){
+  if(!iso) return '';
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+function diaSemana(iso){
+  const dias = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+  const dt = new Date(iso+'T12:00:00');
+  return dias[dt.getDay()];
+}
+function proximaData(items, campoData){
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  return items
+    .filter(i=>i[campoData])
+    .map(i=>({...i, _dt:new Date(i[campoData]+'T12:00:00')}))
+    .filter(i=>i._dt>=hoje)
+    .sort((a,b)=>a._dt-b._dt)[0];
+}
+function aniversariosProximos(limite=6){
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const lista = [];
+  ['celula','gdJovens','gdAdultos'].forEach(g=>{
+    (DATA[g].pessoas||[]).forEach(p=>{
+      if(!p.aniversario || !p.aniversario.includes('/')) return;
+      const [dd,mm] = p.aniversario.split('/').map(Number);
+      if(!dd||!mm) return;
+      let alvo = new Date(hoje.getFullYear(), mm-1, dd);
+      if(alvo < hoje) alvo = new Date(hoje.getFullYear()+1, mm-1, dd);
+      const diff = Math.round((alvo-hoje)/86400000);
+      lista.push({ nome:p.nome, grupo:g, data:p.aniversario, diff });
+    });
+  });
+  return lista.sort((a,b)=>a.diff-b.diff).slice(0,limite);
+}
+function checklistPendentes(grupo){ return (DATA[grupo].checklist||[]).filter(c=>!c.feito).length; }
+
+/* ---------- render raiz ---------- */
+function render(){
+  renderNav();
+  const app = document.getElementById('app');
+  if(VIEW==='painel') app.innerHTML = viewPainel();
+  else if(VIEW==='celula') app.innerHTML = viewGrupo('celula','--celula','--celula-soft','Célula Peregrinos','');
+  else if(VIEW==='gdJovens') app.innerHTML = viewGrupo('gdJovens','--jovens','--jovens-soft','GD Jovens','Grupo de discipulado de jovens coordenado pelo Léo');
+  else if(VIEW==='gdAdultos') app.innerHTML = viewGrupo('gdAdultos','--adultos','--adultos-soft','GD Adultos','Grupo de discipulado de adultos coordenado pelo Léo');
+  else if(VIEW==='calendario') app.innerHTML = viewCalendario();
+  else if(VIEW==='pessoal') app.innerHTML = viewPessoal();
+  bindViewEvents();
+}
+
+/* ---------- PAINEL ---------- */
+function viewPainel(){
+  const proxCelula = proximaData(DATA.celula.encontros,'data');
+  const proxJov = proximaData(encontrosEfetivos('gdJovens'),'data');
+  const proxAd = proximaData(encontrosEfetivos('gdAdultos'),'data');
+  const proxCal = DATA.calendario.filter(e=>e.data).map(e=>({...e,_dt:new Date(e.data+'T12:00:00')})).filter(e=>e._dt>=new Date(new Date().setHours(0,0,0,0))).sort((a,b)=>a._dt-b._dt).slice(0,5);
+  const anivs = aniversariosProximos(6);
+  const hojePainel = new Date(); hojePainel.setHours(0,0,0,0);
+  const proximasPessoais = (DATA.pessoal?.tarefas||[])
+    .filter(t=>!t.feito && t.prazo)
+    .map(t=>({...t,_dt:new Date(t.prazo+'T12:00:00')}))
+    .sort((a,b)=>a._dt-b._dt)
+    .slice(0,5);
+  const areaPessoalLabel = k => ({familia:'Família',trabalho:'Trabalho',estudo:'Estudo',pessoal:'Pessoal'}[k]||'Pessoal');
+  const widgets = {
+    celula: `<div class="card widget-card" style="border-top:3px solid var(--celula)"><span class="drag-handle widget-drag" title="Arrastar">⋮⋮</span><button class="widget-delete" data-action="excluir-widget" data-widget-id="celula" title="Excluir box">×</button><h3>Próxima reunião — Célula</h3>${proxCelula ? `<div class="big">${fmtData(proxCelula.data)} · ${diaSemana(proxCelula.data)}</div><div class="meta">${proxCelula.tema||'Sem tema definido'} — ${proxCelula.anfitriao||'local a definir'}</div>` : `<div class="meta">Nenhuma reunião futura cadastrada.</div>`}</div>`,
+    jovens: `<div class="card widget-card" style="border-top:3px solid var(--jovens)"><span class="drag-handle widget-drag" title="Arrastar">⋮⋮</span><button class="widget-delete" data-action="excluir-widget" data-widget-id="jovens" title="Excluir box">×</button><h3>Próximo encontro — GD Jovens</h3>${proxJov ? `<div class="big">${fmtData(proxJov.data)} · ${diaSemana(proxJov.data)}</div><div class="meta">${proxJov.tema||'Sem tema definido'}${proxJov.fonteCalendario?' · calendário da igreja':''}</div>` : `<div class="meta">Nada cadastrado ainda.</div>`}</div>`,
+    adultos: `<div class="card widget-card" style="border-top:3px solid var(--adultos)"><span class="drag-handle widget-drag" title="Arrastar">⋮⋮</span><button class="widget-delete" data-action="excluir-widget" data-widget-id="adultos" title="Excluir box">×</button><h3>Próximo encontro — GD Adultos</h3>${proxAd ? `<div class="big">${fmtData(proxAd.data)} · ${diaSemana(proxAd.data)}</div><div class="meta">${proxAd.tema||'Sem tema definido'}${proxAd.fonteCalendario?' · calendário da igreja':''}</div>` : `<div class="meta">Nada cadastrado ainda.</div>`}</div>`,
+    eventos: `<div class="card widget-card"><span class="drag-handle widget-drag" title="Arrastar">⋮⋮</span><button class="widget-delete" data-action="excluir-widget" data-widget-id="eventos" title="Excluir box">×</button><h3 style="margin-bottom:10px;">Próximos eventos da igreja</h3>${proxCal.length? `<div class="list">${proxCal.map(e=>`<div class="row" style="padding:9px 12px;"><div class="info"><div class="title" style="font-size:13.5px;">${e.titulo}</div><div class="sub">${fmtData(e.data)} · ${e.categoria}</div></div></div>`).join('')}</div>` : `<div class="empty">Nenhum evento cadastrado.</div>`}</div>`,
+    aniversarios: `<div class="card widget-card"><span class="drag-handle widget-drag" title="Arrastar">⋮⋮</span><button class="widget-delete" data-action="excluir-widget" data-widget-id="aniversarios" title="Excluir box">×</button><h3 style="margin-bottom:10px;">Próximos aniversários</h3>${anivs.length? `<div class="list">${anivs.map(a=>`<div class="row" style="padding:9px 12px;"><div class="info"><div class="title" style="font-size:13.5px;">${a.nome}</div><div class="sub">🎂 ${a.data} · ${a.diff===0?'hoje!':'em '+a.diff+' dia(s)'}</div></div></div>`).join('')}</div>` : `<div class="empty">Cadastre datas de aniversário nas pessoas.</div>`}</div>`,
+    pessoalProximos: `<div class="card widget-card" style="border-top:3px solid var(--pessoal)"><span class="drag-handle widget-drag" title="Arrastar">⋮⋮</span><button class="widget-delete" data-action="excluir-widget" data-widget-id="pessoalProximos" title="Excluir box">×</button><h3 style="margin-bottom:10px;">Próximas tarefas pessoais</h3>${proximasPessoais.length? `<div class="list">${proximasPessoais.map(t=>{ const diff=Math.ceil((t._dt-hojePainel)/86400000); const classe=diff<0?'due-overdue':diff<=3?'due-soon':''; const prazoTxt=diff<0?`${Math.abs(diff)} dia(s) atrasada`:diff===0?'vence hoje':diff===1?'vence amanhã':`em ${diff} dias`; return `<div class="row" style="padding:9px 12px;"><div class="info"><div class="title" style="font-size:13.5px;">${t.texto}</div><div class="sub ${classe}"><span class="personal-area-badge">${areaPessoalLabel(t.area)}</span> ${fmtData(t.prazo)} · ${prazoTxt}</div></div></div>`;}).join('')}</div>` : `<div class="empty">Nenhuma tarefa pessoal com prazo pendente.</div>`}</div>`,
+    checkCelula: `<div class="card widget-card"><span class="drag-handle widget-drag" title="Arrastar">⋮⋮</span><button class="widget-delete" data-action="excluir-widget" data-widget-id="checkCelula" title="Excluir box">×</button><h3>Checklist pendente — Célula</h3><div class="big">${checklistPendentes('celula')} <span style="font-size:13px;font-weight:400;color:var(--ink-soft);">itens</span></div></div>`,
+    checkJovens: `<div class="card widget-card"><span class="drag-handle widget-drag" title="Arrastar">⋮⋮</span><button class="widget-delete" data-action="excluir-widget" data-widget-id="checkJovens" title="Excluir box">×</button><h3>Checklist pendente — GD Jovens</h3><div class="big">${checklistPendentes('gdJovens')} <span style="font-size:13px;font-weight:400;color:var(--ink-soft);">itens</span></div></div>`,
+    checkAdultos: `<div class="card widget-card"><span class="drag-handle widget-drag" title="Arrastar">⋮⋮</span><button class="widget-delete" data-action="excluir-widget" data-widget-id="checkAdultos" title="Excluir box">×</button><h3>Checklist pendente — GD Adultos</h3><div class="big">${checklistPendentes('gdAdultos')} <span style="font-size:13px;font-weight:400;color:var(--ink-soft);">itens</span></div></div>`
+  };
+  const labels = {celula:'Próxima reunião — Célula',jovens:'Próximo encontro — GD Jovens',adultos:'Próximo encontro — GD Adultos',eventos:'Próximos eventos da igreja',aniversarios:'Próximos aniversários',pessoalProximos:'Próximas tarefas pessoais',checkCelula:'Checklist — Célula',checkJovens:'Checklist — GD Jovens',checkAdultos:'Checklist — GD Adultos'};
+  const defaultOrder = Object.keys(widgets);
+  DATA.layout = DATA.layout || {};
+  DATA.layout.hiddenWidgets = DATA.layout.hiddenWidgets || [];
+  DATA.layout.positions = DATA.layout.positions || {};
+  DATA.layout.painel = (DATA.layout.painel||defaultOrder).filter(k=>widgets[k] && !DATA.layout.hiddenWidgets.includes(k));
+  defaultOrder.forEach(k=>{ if(!DATA.layout.hiddenWidgets.includes(k) && !DATA.layout.painel.includes(k)) DATA.layout.painel.push(k); });
+  const hiddenOptions = DATA.layout.hiddenWidgets.map(k=>`<option value="${k}">${labels[k]||k}</option>`).join('');
+
+  return `
+    <div class="view-head" style="--theme:var(--painel)">
+      <div class="eyebrow">Célula Peregrinos</div>
+      <h1>Visão geral</h1>
+      <p>No computador, arraste cada box livremente para qualquer ponto do painel. No celular, eles se reorganizam em coluna automaticamente.</p>
+    </div>
+    <div class="dashboard-toolbar">
+      <div class="hint-drag">⋮⋮ Arraste pelo ícone. O posicionamento fica salvo.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">${DATA.layout.hiddenWidgets.length ? `<button class="btn small" data-action="restaurar-widget">+ Restaurar box</button>` : ''}<button class="btn small" data-action="desfazer-layout">↶ Desfazer</button><button class="btn small" data-action="refazer-layout">Refazer ↷</button></div>
+    </div>
+    <div class="freeboard" id="dashboard-widgets">
+      ${DATA.layout.painel.length ? DATA.layout.painel.map((k,i)=>{
+        const pos=DATA.layout.positions[k]||{};
+        const left=Number.isFinite(pos.xPct)?pos.xPct:((i%3)*34);
+        const top=Number.isFinite(pos.y)?pos.y:(Math.floor(i/3)*210);
+        return `<div class="dashboard-widget" data-widget-id="${k}" style="left:${left}%;top:${top}px;">${widgets[k]}</div>`;
+      }).join('') : `<div class="freeboard-empty">Você excluiu todos os boxes. Use “Restaurar box” para trazê-los de volta.</div>`}
+    </div>
+    <select id="hidden-widget-select" style="display:none">${hiddenOptions}</select>`;
+}
+
+/* ---------- GRUPO (Célula / GD Jovens / GD Adultos) ---------- */
+function viewGrupo(key, cssVar, cssVarSoft, titulo, subtitulo){
+  const g = DATA[key];
+  const tab = SUBTAB[key];
+  return `
+    <div class="view-head" style="--theme:var(${cssVar})">
+      <div class="eyebrow">${titulo}</div>
+      <h1>${titulo}</h1>
+      ${subtitulo ? `<p>${subtitulo}</p>` : ''}
+    </div>
+    ${key==='celula' ? `<div class="info-strip"><div class="eyebrow">Informações da célula</div><h2>${g.nome||'Peregrinos'}</h2><p><strong>${g.horario||''}</strong></p><p>${g.endereco||''}</p><p>${g.versiculo||''}${g.lideres?' · Líderes: '+g.lideres:''}</p><button class="btn small" data-action="editar-info-celula" data-grupo="${key}">Editar informações</button></div>` : ''}
+    <div class="tabs" style="--theme:var(${cssVar})">
+      <button data-grupo="${key}" data-tab="pessoas" class="${tab==='pessoas'?'active':''}">Pessoas (${g.pessoas.length})</button>
+      <button data-grupo="${key}" data-tab="encontros" class="${tab==='encontros'?'active':''}">Reuniões / encontros (${encontrosEfetivos(key).length})</button>
+      <button data-grupo="${key}" data-tab="checklist" class="${tab==='checklist'?'active':''}">Checklist (${checklistPendentes(key)} pendentes)</button>
+    </div>
+    <div style="--theme:var(${cssVar});--theme-soft:var(${cssVarSoft})">
+      ${tab==='pessoas' ? renderPessoas(key) : tab==='encontros' ? renderEncontros(key) : renderChecklist(key)}
+    </div>
+  `;
+}
+
+function iniciais(nome){
+  return (nome||'?').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase();
+}
+function renderPessoas(key){
+  const g = DATA[key];
+  return `
+    <div class="section-head">
+      <h2>Pessoas</h2>
+      <button class="btn primary" data-action="nova-pessoa" data-grupo="${key}">+ Adicionar pessoa</button>
+    </div>
+    <div class="hint-drag">⋮⋮ Arraste as pessoas para mudar a ordem (inclusive líderes e auxiliares). As fotos ficam salvas neste navegador e também entram no backup.</div>
+    ${g.pessoas.length? `<div class="list sortable-list" data-sort-type="pessoas" data-grupo="${key}">${g.pessoas.map(p=>`
+      <div class="row draggable" draggable="true" data-id="${p.id}">
+        <div class="person-main">
+          ${p.foto ? `<img class="avatar" src="${p.foto}" alt="Foto de ${p.nome}">` : `<div class="avatar-placeholder" aria-label="Sem foto">${iniciais(p.nome)}</div>`}
+          <div class="info">
+            <div class="title"><span class="drag-handle">⋮⋮</span>${p.nome} ${p.papel? `<span class="role-pill" data-role="${p.papel}">${p.papel}</span>`:''}</div>
+            <div class="sub">${[p.aniversario?('🎂 '+p.aniversario):'', p.telefone, p.obs].filter(Boolean).join(' · ')}</div>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="icon-btn" data-action="editar-pessoa" data-grupo="${key}" data-id="${p.id}">Editar</button>
+          ${p.foto? `<button class="icon-btn" data-action="baixar-foto" data-grupo="${key}" data-id="${p.id}">Baixar foto</button>`:''}
+          <button class="icon-btn" data-action="excluir-pessoa" data-grupo="${key}" data-id="${p.id}">Excluir</button>
+        </div>
+      </div>`).join('')}</div>` : `<div class="empty">Ninguém cadastrado ainda. Clique em "Adicionar pessoa".</div>`}
+  `;
+}
+
+function renderEncontros(key){
+  const g = DATA[key];
+  const ordenados = encontrosEfetivos(key).sort((a,b)=> (a.data||'').localeCompare(b.data||''));
+  return `
+    <div class="section-head">
+      <h2>Reuniões / encontros</h2>
+      <button class="btn primary" data-action="novo-encontro" data-grupo="${key}">+ Nova reunião</button>
+    </div>
+    ${(key==='gdJovens'||key==='gdAdultos')?`<div class="banner"><span>🔗</span><div><b>Conectado ao calendário da igreja.</b> Os encontros oficiais deste GD aparecem aqui automaticamente. As tarefas internas continuam editáveis no checklist.</div></div>`:''}
+    ${ordenados.length? `<div class="list">${ordenados.map(e=>{
+      const tarefas = e.tarefas||{};
+      const linhaTarefas = ['mensagem:Mensagem','quebraGelo:Quebra-gelo','louvor:Louvor','visao:Visão','avisos:Avisos/Oração']
+        .map(t=>{ const [k,label]=t.split(':'); return tarefas[k]? `${label}: ${tarefas[k]}`:null; })
+        .filter(Boolean).join(' · ');
+      return `
+      <div class="row">
+        <div class="info">
+          <div class="title">${fmtData(e.data)}${e.data? ' · '+diaSemana(e.data):''} — ${e.tema||'Sem tema'} ${e.fonteCalendario?'<span class="pill">Calendário da igreja</span>':''}</div>
+          <div class="sub">${e.anfitriao? 'Anfitrião(ã): '+e.anfitriao+' · ':''}${linhaTarefas||'Tarefas não definidas'}</div>
+          ${e.obs? `<div class="sub">${e.obs}</div>`:''}
+        </div>
+        <div class="actions">
+          ${e.fonteCalendario ? `<button class="icon-btn" data-action="ir-calendario">Ver no calendário</button>` : `<button class="icon-btn" data-action="editar-encontro" data-grupo="${key}" data-id="${e.id}">Editar</button><button class="icon-btn" data-action="excluir-encontro" data-grupo="${key}" data-id="${e.id}">Excluir</button>`}
+        </div>
+      </div>`;}).join('')}</div>` : `<div class="empty">Nenhuma reunião cadastrada ainda.</div>`}
+  `;
+}
+
+function renderChecklist(key){
+  const g = DATA[key];
+  return `
+    <div class="section-head">
+      <h2>Checklist de intencionalidade</h2>
+      <div style="display:flex;gap:8px;">
+        <button class="btn small" data-action="reset-checklist" data-grupo="${key}">Desmarcar tudo</button>
+        <button class="btn primary small" data-action="novo-checklist" data-grupo="${key}">+ Item</button>
+      </div>
+    </div>
+    <div class="hint-drag">⋮⋮ Você também pode reorganizar os itens do checklist.</div>
+    ${g.checklist.length? `<div class="list sortable-list" data-sort-type="checklist" data-grupo="${key}">${g.checklist.map(c=>`
+      <div class="checklist-item draggable ${c.feito?'done':''}" draggable="true" data-id="${c.id}">
+        <span class="drag-handle">⋮⋮</span>
+        <input type="checkbox" data-action="toggle-checklist" data-grupo="${key}" data-id="${c.id}" ${c.feito?'checked':''}>
+        <div class="txt">${c.texto}</div>
+        <button class="icon-btn" data-action="editar-checklist" data-grupo="${key}" data-id="${c.id}">Editar</button>
+        <button class="icon-btn" data-action="excluir-checklist" data-grupo="${key}" data-id="${c.id}">✕</button>
+      </div>`).join('')}</div>` : `<div class="empty">Nenhum item ainda.</div>`}
+  `;
+}
+
+/* ---------- CALENDÁRIO ---------- */
+function viewCalendario(){
+  const ordenados = [...DATA.calendario].sort((a,b)=> (a.data||'').localeCompare(b.data||''));
+  return `
+    <div class="view-head" style="--theme:var(--ink-soft)">
+      <div class="eyebrow">Calendário</div>
+      <h1>Calendário da igreja</h1>
+      <p>Agenda da igreja carregada até dezembro de 2026 a partir do <a href="https://pibbotafogo.github.io/calendario2026/" target="_blank" rel="noopener">calendário oficial</a>. Eventos do GD Jovens e GD Adultos aparecem automaticamente também nas páginas dos respectivos GDs e no painel principal.</p>
+    </div>
+    <div class="section-head">
+      <h2>Eventos (${ordenados.length})</h2>
+      <button class="btn primary" data-action="novo-evento">+ Adicionar evento</button>
+    </div>
+    ${ordenados.length? `<div class="list">${ordenados.map(e=>`
+      <div class="row">
+        <div class="info">
+          <div class="title"><span class="pill" style="background:var(--celula-soft);color:var(--celula);">${e.categoria}</span>${e.titulo}${e.oficial?` <span class="pill" style="background:#EEF0EA;color:#6B6D5C;">Oficial</span>`:''}</div>
+          <div class="sub">${fmtData(e.data)}${e.data? ' · '+diaSemana(e.data):''}${e.obs? ' · '+e.obs:''}</div>
+        </div>
+        <div class="actions">
+          <button class="icon-btn" data-action="editar-evento" data-id="${e.id}">Editar</button>
+          <button class="icon-btn" data-action="excluir-evento" data-id="${e.id}">Excluir</button>
+        </div>
+      </div>`).join('')}</div>` : `<div class="empty">Nenhum evento cadastrado ainda.</div>`}
+  `;
+}
+
+/* ---------- PESSOAL ---------- */
+const AREAS_PESSOAL = [{k:'familia',l:'Família'},{k:'trabalho',l:'Trabalho'},{k:'estudo',l:'Estudo'},{k:'pessoal',l:'Pessoal'}];
+function viewPessoal(){
+  const tab = SUBTAB.pessoal;
+  return `
+    <div class="view-head" style="--theme:var(--pessoal)">
+      <div class="eyebrow">Vida pessoal</div>
+      <h1>Família, trabalho &amp; estudo</h1>
+      <p>Um espaço separado da célula e dos GDs pra você não perder de vista o resto da vida.</p>
+    </div>
+    <div class="tabs" style="--theme:var(--pessoal)">
+      <button data-tab-pessoal="tarefas" class="${tab==='tarefas'?'active':''}">Tarefas</button>
+      <button data-tab-pessoal="notas" class="${tab==='notas'?'active':''}">Notas</button>
+    </div>
+    <div style="--theme:var(--pessoal);--theme-soft:var(--pessoal-soft)">
+      ${tab==='tarefas'? renderTarefasPessoal() : renderNotasPessoal()}
+    </div>
+  `;
+}
+function renderTarefasPessoal(){
+  const tarefas = DATA.pessoal.tarefas;
+  return `
+    <div class="section-head">
+      <h2>Tarefas</h2>
+      <button class="btn primary" data-action="nova-tarefa-pessoal">+ Tarefa</button>
+    </div>
+    ${tarefas.length? `<div class="list">${AREAS_PESSOAL.map(a=>{
+        const itens = tarefas.filter(t=>t.area===a.k);
+        if(!itens.length) return '';
+        return `<div style="margin-bottom:6px;"><div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.02em;margin:10px 0 6px;">${a.l.toUpperCase()}</div>` +
+          itens.map(t=>`
+          <div class="checklist-item ${t.feito?'done':''}">
+            <input type="checkbox" data-action="toggle-tarefa-pessoal" data-id="${t.id}" ${t.feito?'checked':''}>
+            <div class="txt">${t.texto}${t.prazo? ` <span style="color:var(--ink-soft);">· ${fmtData(t.prazo)}</span>`:''}</div>
+            <button class="icon-btn" data-action="editar-tarefa-pessoal" data-id="${t.id}">Editar</button>
+            <button class="icon-btn" data-action="excluir-tarefa-pessoal" data-id="${t.id}">✕</button>
+          </div>`).join('') + `</div>`;
+      }).join('')}</div>` : `<div class="empty">Nenhuma tarefa pessoal ainda.</div>`}
+  `;
+}
+function renderNotasPessoal(){
+  const n = DATA.pessoal.notas;
+  return `
+    <div class="grid" style="grid-template-columns:1fr 1fr;">
+      ${AREAS_PESSOAL.map(a=>`
+        <div>
+          <h3 style="margin:0 0 8px;font-size:13.5px;">${a.l}</h3>
+          <textarea class="notes" data-notas-area="${a.k}" placeholder="Anotações sobre ${a.l.toLowerCase()}...">${n[a.k]||''}</textarea>
+        </div>`).join('')}
+    </div>
+  `;
+}
+
+/* ---------- modal genérico ---------- */
+function redimensionarFoto(file, maxSize=640, quality=.86){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onerror=reject;
+    reader.onload=()=>{
+      const img=new Image();
+      img.onerror=reject;
+      img.onload=()=>{
+        let w=img.naturalWidth, h=img.naturalHeight;
+        const scale=Math.min(1,maxSize/Math.max(w,h));
+        w=Math.max(1,Math.round(w*scale)); h=Math.max(1,Math.round(h*scale));
+        const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
+        const ctx=canvas.getContext('2d'); ctx.drawImage(img,0,0,w,h);
+        resolve(canvas.toDataURL('image/jpeg',quality));
+      };
+      img.src=reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+function nomeArquivoSeguro(nome){ return (nome||'foto').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9_-]+/g,'-').replace(/^-+|-+$/g,'').toLowerCase()||'foto'; }
+function baixarDataUrl(dataUrl,nome){
+  if(!dataUrl) return;
+  const a=document.createElement('a'); a.href=dataUrl; a.download=nome||'foto-membro.jpg'; document.body.appendChild(a); a.click(); a.remove();
+}
+function openModal(titulo, fields, initial, onSave){
+  const overlay = document.getElementById('overlay');
+  const modal = document.getElementById('modal');
+  const fieldState={};
+  fields.forEach(f=>{ fieldState[f.key]=(initial && initial[f.key]!==undefined) ? initial[f.key] : (f.default||''); });
+  modal.innerHTML = `
+    <h3>${titulo}</h3>
+    <div id="modal-fields"></div>
+    <div class="modal-actions">
+      <button class="btn" id="modal-cancel">Cancelar</button>
+      <button class="btn primary" id="modal-save">Salvar</button>
+    </div>`;
+  const fieldsWrap = modal.querySelector('#modal-fields');
+  fieldsWrap.innerHTML = fields.map(f=>{
+    const val = fieldState[f.key];
+    if(f.type==='textarea') return `<div class="field"><label>${f.label}</label><textarea data-field="${f.key}">${val}</textarea></div>`;
+    if(f.type==='select') return `<div class="field"><label>${f.label}</label><select data-field="${f.key}">${f.options.map(o=>{ const ov=typeof o==='object'?o.value:o; const ol=typeof o==='object'?o.label:o; return `<option value="${ov}" ${ov===val?'selected':''}>${ol}</option>`; }).join('')}</select></div>`;
+    if(f.type==='image') return `<div class="field"><label>${f.label}</label><div class="photo-field" data-image-field="${f.key}">
+      <div class="photo-preview-wrap">${val?`<img class="photo-preview" data-photo-preview src="${val}" alt="Prévia da foto">`:`<div class="photo-preview empty" data-photo-empty>Sem foto</div>`}<div><strong style="font-size:13px;">Avatar do membro</strong><div class="photo-help" style="margin-top:3px;">JPG, PNG ou HEIC compatível com o navegador.</div></div></div>
+      <input type="file" accept="image/*" data-photo-input style="display:none">
+      <div class="photo-actions"><button type="button" class="btn small" data-photo-upload>Escolher foto</button><button type="button" class="btn small" data-photo-download ${val?'':'disabled'}>Baixar foto</button><button type="button" class="btn small danger" data-photo-remove ${val?'':'disabled'}>Remover</button></div>
+      <div class="photo-help">A imagem é reduzida automaticamente para não deixar o arquivo do planner pesado.</div>
+    </div></div>`;
+    return `<div class="field"><label>${f.label}</label><input type="${f.type||'text'}" data-field="${f.key}" value="${val||''}"></div>`;
+  }).join('');
+
+  fields.filter(f=>f.type==='image').forEach(f=>{
+    const wrap=fieldsWrap.querySelector(`[data-image-field="${f.key}"]`);
+    const input=wrap.querySelector('[data-photo-input]');
+    const upload=wrap.querySelector('[data-photo-upload]');
+    const download=wrap.querySelector('[data-photo-download]');
+    const remove=wrap.querySelector('[data-photo-remove]');
+    const redraw=()=>{
+      const old=wrap.querySelector('[data-photo-preview], [data-photo-empty]');
+      const fresh=fieldState[f.key]?Object.assign(document.createElement('img'),{className:'photo-preview',src:fieldState[f.key],alt:'Prévia da foto'}):Object.assign(document.createElement('div'),{className:'photo-preview empty',textContent:'Sem foto'});
+      fieldState[f.key]?fresh.setAttribute('data-photo-preview',''):fresh.setAttribute('data-photo-empty','');
+      old.replaceWith(fresh); download.disabled=!fieldState[f.key]; remove.disabled=!fieldState[f.key];
+    };
+    upload.onclick=()=>input.click();
+    input.onchange=async()=>{ const file=input.files&&input.files[0]; if(!file) return; upload.disabled=true; upload.textContent='Processando…'; try{ fieldState[f.key]=await redimensionarFoto(file); redraw(); }catch(e){ alert('Não consegui abrir essa imagem. Tente JPG ou PNG.'); } finally{ upload.disabled=false; upload.textContent='Escolher foto'; input.value=''; } };
+    download.onclick=()=>baixarDataUrl(fieldState[f.key],`${nomeArquivoSeguro(fieldState.nome||initial?.nome||'membro')}-avatar.jpg`);
+    remove.onclick=()=>{ if(fieldState[f.key] && confirm('Remover a foto deste membro?')){ fieldState[f.key]=''; redraw(); } };
+  });
+
+  overlay.classList.add('open');
+  modal.querySelector('#modal-cancel').onclick = ()=> overlay.classList.remove('open');
+  modal.querySelector('#modal-save').onclick = ()=>{
+    const result = {};
+    fields.forEach(f=>{ result[f.key] = f.type==='image' ? fieldState[f.key] : modal.querySelector(`[data-field="${f.key}"]`).value; });
+    onSave(result);
+    overlay.classList.remove('open');
+  };
+}
+
+/* ---------- ações ---------- */
+function bindViewEvents(){
+  document.querySelectorAll('[data-grupo][data-tab]').forEach(b=>{
+    b.addEventListener('click', ()=>{ SUBTAB[b.dataset.grupo]=b.dataset.tab; render(); });
+  });
+  document.querySelectorAll('[data-tab-pessoal]').forEach(b=>{
+    b.addEventListener('click', ()=>{ SUBTAB.pessoal=b.dataset.tabPessoal; render(); });
+  });
+
+  document.querySelectorAll('[data-action]').forEach(el=>{
+    el.addEventListener(el.type==='checkbox'?'change':'click', (ev)=>handleAction(el.dataset, ev));
+  });
+
+  bindDragAndDrop();
+
+  document.querySelectorAll('[data-notas-area]').forEach(ta=>{
+    ta.addEventListener('input', ()=>{ DATA.pessoal.notas[ta.dataset.notasArea]=ta.value; saveData(DATA); });
+  });
+}
+
+const LAYOUT_UNDO = [];
+const LAYOUT_REDO = [];
+function layoutSnapshot(){ return JSON.parse(JSON.stringify(DATA.layout||{})); }
+function rememberLayout(){ LAYOUT_UNDO.push(layoutSnapshot()); if(LAYOUT_UNDO.length>50) LAYOUT_UNDO.shift(); LAYOUT_REDO.length=0; }
+function undoLayout(){ if(!LAYOUT_UNDO.length) return; LAYOUT_REDO.push(layoutSnapshot()); DATA.layout=LAYOUT_UNDO.pop(); saveData(DATA); render(); }
+function redoLayout(){ if(!LAYOUT_REDO.length) return; LAYOUT_UNDO.push(layoutSnapshot()); DATA.layout=LAYOUT_REDO.pop(); saveData(DATA); render(); }
+
+function handleAction(ds){
+  const grupo = ds.grupo;
+  switch(ds.action){
+    case 'ir-calendario': VIEW='calendario'; render(); break;
+    case 'desfazer-layout': undoLayout(); break;
+    case 'refazer-layout': redoLayout(); break;
+    case 'excluir-widget': { const id=ds.widgetId; if(confirm('Excluir este box do painel? Você poderá restaurá-lo depois.')){ rememberLayout(); DATA.layout=DATA.layout||{}; DATA.layout.hiddenWidgets=DATA.layout.hiddenWidgets||[]; if(!DATA.layout.hiddenWidgets.includes(id)) DATA.layout.hiddenWidgets.push(id); DATA.layout.painel=(DATA.layout.painel||[]).filter(k=>k!==id); if(DATA.layout.positions) delete DATA.layout.positions[id]; saveData(DATA); render(); } break; }
+    case 'restaurar-widget': { const hidden=(DATA.layout?.hiddenWidgets||[]); if(!hidden.length) break; const labels={celula:'Próxima reunião — Célula',jovens:'Próximo encontro — GD Jovens',adultos:'Próximo encontro — GD Adultos',eventos:'Próximos eventos da igreja',aniversarios:'Próximos aniversários',pessoalProximos:'Próximas tarefas pessoais',checkCelula:'Checklist — Célula',checkJovens:'Checklist — GD Jovens',checkAdultos:'Checklist — GD Adultos'}; openModal('Restaurar box', [{key:'widget',label:'Box',type:'select',options:hidden.map(k=>labels[k]||k)}], {}, (v)=>{ const entry=Object.entries(labels).find(([k,l])=>l===v.widget); const id=entry?entry[0]:hidden[0]; rememberLayout(); DATA.layout.hiddenWidgets=hidden.filter(k=>k!==id); DATA.layout.painel=DATA.layout.painel||[]; if(!DATA.layout.painel.includes(id)) DATA.layout.painel.push(id); saveData(DATA); render(); }); break; }
+    case 'editar-info-celula': openModal('Editar informações da célula', infoCelulaFields(), DATA.celula, (v)=>{ Object.assign(DATA.celula,v); saveData(DATA); render(); }); break;
+    case 'nova-pessoa': openModal('Nova pessoa', pessoaFields(), {}, (v)=>{ DATA[grupo].pessoas.push({id:uid(),...v}); saveData(DATA); render(); }); break;
+    case 'editar-pessoa': { const p = DATA[grupo].pessoas.find(x=>x.id===ds.id); openModal('Editar pessoa', pessoaFields(), p, (v)=>{ Object.assign(p,v); saveData(DATA); render(); }); break; }
+    case 'baixar-foto': { const p=DATA[grupo].pessoas.find(x=>x.id===ds.id); if(p?.foto) baixarDataUrl(p.foto, `${nomeArquivoSeguro(p.nome)}-avatar.jpg`); break; }
+    case 'excluir-pessoa': if(confirm('Excluir esta pessoa?')){ DATA[grupo].pessoas = DATA[grupo].pessoas.filter(x=>x.id!==ds.id); saveData(DATA); render(); } break;
+
+    case 'novo-encontro': openModal('Nova reunião', encontroFields(), {}, (v)=>{ DATA[grupo].encontros.push(formatEncontro(v)); saveData(DATA); render(); }); break;
+    case 'editar-encontro': { const e = DATA[grupo].encontros.find(x=>x.id===ds.id); openModal('Editar reunião', encontroFields(), flattenEncontro(e), (v)=>{ Object.assign(e, formatEncontro(v)); e.id=ds.id; saveData(DATA); render(); }); break; }
+    case 'excluir-encontro': if(confirm('Excluir esta reunião?')){ DATA[grupo].encontros = DATA[grupo].encontros.filter(x=>x.id!==ds.id); saveData(DATA); render(); } break;
+
+    case 'novo-checklist': openModal('Novo item do checklist', [{key:'texto',label:'Item',type:'text'}], {}, (v)=>{ DATA[grupo].checklist.push({id:uid(), texto:v.texto, feito:false}); saveData(DATA); render(); }); break;
+    case 'editar-checklist': { const c = DATA[grupo].checklist.find(x=>x.id===ds.id); openModal('Editar item do checklist', [{key:'texto',label:'Item',type:'text'}], c, (v)=>{ c.texto=v.texto; saveData(DATA); render(); }); break; }
+    case 'excluir-checklist': DATA[grupo].checklist = DATA[grupo].checklist.filter(x=>x.id!==ds.id); saveData(DATA); render(); break;
+    case 'toggle-checklist': { const c = DATA[grupo].checklist.find(x=>x.id===ds.id); c.feito=!c.feito; saveData(DATA); render(); break; }
+    case 'reset-checklist': DATA[grupo].checklist.forEach(c=>c.feito=false); saveData(DATA); render(); break;
+
+    case 'novo-evento': openModal('Novo evento', eventoFields(), {}, (v)=>{ DATA.calendario.push({id:uid(),...v}); saveData(DATA); render(); }); break;
+    case 'editar-evento': { const e = DATA.calendario.find(x=>x.id===ds.id); openModal('Editar evento', eventoFields(), e, (v)=>{ Object.assign(e,v); saveData(DATA); render(); }); break; }
+    case 'excluir-evento': if(confirm('Excluir este evento?')){ const alvo=DATA.calendario.find(x=>x.id===ds.id); if(alvo?.chaveOficial){ DATA.calendarioOcultos=DATA.calendarioOcultos||[]; if(!DATA.calendarioOcultos.includes(alvo.chaveOficial)) DATA.calendarioOcultos.push(alvo.chaveOficial); } DATA.calendario = DATA.calendario.filter(x=>x.id!==ds.id); saveData(DATA); render(); } break;
+
+    case 'nova-tarefa-pessoal': openModal('Nova tarefa', tarefaPessoalFields(), {}, (v)=>{ DATA.pessoal.tarefas.push({id:uid(),...v, feito:false}); saveData(DATA); render(); }); break;
+    case 'editar-tarefa-pessoal': { const t = DATA.pessoal.tarefas.find(x=>x.id===ds.id); openModal('Editar tarefa', tarefaPessoalFields(), t, (v)=>{ Object.assign(t,v); saveData(DATA); render(); }); break; }
+    case 'toggle-tarefa-pessoal': { const t = DATA.pessoal.tarefas.find(x=>x.id===ds.id); t.feito=!t.feito; saveData(DATA); render(); break; }
+    case 'excluir-tarefa-pessoal': DATA.pessoal.tarefas = DATA.pessoal.tarefas.filter(x=>x.id!==ds.id); saveData(DATA); render(); break;
+  }
+}
+
+function pessoaFields(){
+  return [
+    {key:'nome', label:'Nome', type:'text'},
+    {key:'foto', label:'Foto / avatar', type:'image'},
+    {key:'papel', label:'Categoria / função', type:'select', options:['Líder','Auxiliar','Anfitrião(ã)','Membro','Convidado']},
+    {key:'aniversario', label:'Aniversário (dd/mm)', type:'text'},
+    {key:'telefone', label:'Telefone', type:'text'},
+    {key:'obs', label:'Observações', type:'textarea'}
+  ];
+}
+function infoCelulaFields(){
+  return [
+    {key:'nome', label:'Nome da célula', type:'text'},
+    {key:'versiculo', label:'Versículo', type:'text'},
+    {key:'horario', label:'Dia e horário', type:'text'},
+    {key:'endereco', label:'Endereço', type:'text'},
+    {key:'lideres', label:'Líderes', type:'text'}
+  ];
+}
+
+function encontroFields(){
+  return [
+    {key:'data', label:'Data', type:'date'},
+    {key:'tema', label:'Tema', type:'text'},
+    {key:'anfitriao', label:'Casa anfitriã', type:'text'},
+    {key:'mensagem', label:'Mensagem', type:'text'},
+    {key:'quebraGelo', label:'Quebra-gelo', type:'text'},
+    {key:'louvor', label:'Louvor', type:'text'},
+    {key:'visao', label:'Visão', type:'text'},
+    {key:'avisos', label:'Avisos/Oração', type:'text'},
+    {key:'obs', label:'Observações', type:'textarea'}
+  ];
+}
+function flattenEncontro(e){ return { data:e.data, tema:e.tema, anfitriao:e.anfitriao, obs:e.obs, ...e.tarefas }; }
+function formatEncontro(v){
+  return { data:v.data, tema:v.tema, anfitriao:v.anfitriao, obs:v.obs,
+    tarefas:{ mensagem:v.mensagem, quebraGelo:v.quebraGelo, louvor:v.louvor, visao:v.visao, avisos:v.avisos } };
+}
+function eventoFields(){
+  return [
+    {key:'data', label:'Data', type:'date'},
+    {key:'titulo', label:'Título', type:'text'},
+    {key:'categoria', label:'Categoria', type:'select', options:CATEGORIAS_CAL},
+    {key:'obs', label:'Observações', type:'textarea'}
+  ];
+}
+function tarefaPessoalFields(){
+  return [
+    {key:'texto', label:'Tarefa', type:'text'},
+    {key:'area', label:'Área', type:'select', options:[{value:'familia',label:'Família'},{value:'trabalho',label:'Trabalho'},{value:'estudo',label:'Estudo'},{value:'pessoal',label:'Pessoal'}]},
+    {key:'prazo', label:'Prazo (opcional)', type:'date'}
+  ];
+}
+
+/* ---------- arrastar e reorganizar ---------- */
+function bindDragAndDrop(){
+  bindFreeDashboard();
+
+  let dragged = null;
+  document.querySelectorAll('.sortable-list .draggable[draggable="true"]').forEach(el=>{
+    el.addEventListener('dragstart', (ev)=>{
+      dragged = el;
+      el.classList.add('dragging');
+      ev.dataTransfer.effectAllowed = 'move';
+      try{ ev.dataTransfer.setData('text/plain', el.dataset.id || 'drag'); }catch(e){}
+    });
+    el.addEventListener('dragend', ()=>{
+      el.classList.remove('dragging');
+      document.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over'));
+      persistCurrentOrder();
+      dragged = null;
+    });
+    el.addEventListener('dragover', (ev)=>{
+      if(!dragged || dragged===el || dragged.parentElement!==el.parentElement) return;
+      ev.preventDefault();
+      el.classList.add('drag-over');
+      const rect = el.getBoundingClientRect();
+      el.parentElement.insertBefore(dragged, ev.clientY < rect.top + rect.height/2 ? el : el.nextSibling);
+    });
+    el.addEventListener('dragleave', ()=>el.classList.remove('drag-over'));
+  });
+}
+
+function bindFreeDashboard(){
+  const board=document.getElementById('dashboard-widgets');
+  if(!board || window.matchMedia('(max-width: 860px)').matches) return;
+  const widgets=[...board.querySelectorAll('.dashboard-widget')];
+  widgets.forEach(widget=>{
+    const handle=widget.querySelector('.widget-drag');
+    if(!handle) return;
+    handle.addEventListener('pointerdown', ev=>{
+      if(ev.button!==0) return;
+      rememberLayout();
+      ev.preventDefault();
+      handle.setPointerCapture?.(ev.pointerId);
+      widget.classList.add('dragging');
+      const boardRect=board.getBoundingClientRect();
+      const rect=widget.getBoundingClientRect();
+      const offsetX=ev.clientX-rect.left;
+      const offsetY=ev.clientY-rect.top;
+      const onMove=e=>{
+        const currentBoard=board.getBoundingClientRect();
+        const maxX=Math.max(0,currentBoard.width-widget.offsetWidth);
+        const maxY=Math.max(0,currentBoard.height-widget.offsetHeight);
+        let x=e.clientX-currentBoard.left-offsetX;
+        let y=e.clientY-currentBoard.top-offsetY;
+        x=Math.max(0,Math.min(maxX,x));
+        y=Math.max(0,Math.min(maxY,y));
+        widget.style.left=(maxX?x/maxX*100:0)+'%';
+        widget.style.top=y+'px';
+      };
+      const onUp=e=>{
+        widget.classList.remove('dragging');
+        handle.releasePointerCapture?.(ev.pointerId);
+        handle.removeEventListener('pointermove',onMove);
+        handle.removeEventListener('pointerup',onUp);
+        handle.removeEventListener('pointercancel',onUp);
+        saveDashboardPosition(widget,board);
+      };
+      handle.addEventListener('pointermove',onMove);
+      handle.addEventListener('pointerup',onUp);
+      handle.addEventListener('pointercancel',onUp);
+    });
+  });
+}
+
+function saveDashboardPosition(widget,board){
+  DATA.layout=DATA.layout||{};
+  DATA.layout.positions=DATA.layout.positions||{};
+  const maxX=Math.max(0,board.clientWidth-widget.offsetWidth);
+  const left=parseFloat(widget.style.left)||0;
+  const x=maxX ? (left/100)*maxX : 0;
+  DATA.layout.positions[widget.dataset.widgetId]={xPct:maxX?x/maxX*100:0,y:parseFloat(widget.style.top)||0};
+  saveData(DATA);
+}
+
+function persistCurrentOrder(){
+  document.querySelectorAll('.sortable-list').forEach(list=>{
+    const key=list.dataset.grupo, type=list.dataset.sortType;
+    if(!key || !type || !DATA[key]?.[type]) return;
+    const ids=[...list.querySelectorAll(':scope > [data-id]')].map(x=>x.dataset.id);
+    const map=new Map(DATA[key][type].map(x=>[x.id,x]));
+    DATA[key][type]=ids.map(id=>map.get(id)).filter(Boolean);
+  });
+  saveData(DATA);
+}
+
+/* ---------- export / import ---------- */
+document.getElementById('btn-export').addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(DATA,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `planner-celula-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+});
+document.getElementById('btn-import').addEventListener('click', ()=> document.getElementById('import-file').click());
+document.getElementById('import-file').addEventListener('change', (ev)=>{
+  const file = ev.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{ const parsed = JSON.parse(reader.result); DATA = parsed; saveData(DATA); render(); alert('Backup importado com sucesso.'); }
+    catch(e){ alert('Não consegui ler esse arquivo. Confirme se é um backup exportado por este planner.'); }
+  };
+  reader.readAsText(file);
+});
+document.getElementById('menu-toggle').addEventListener('click', ()=> document.getElementById('shell').classList.toggle('nav-open'));
+
+render();
+</script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged,
+  signOut, setPersistence, browserLocalPersistence
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import {
+  getFirestore, doc, collection, getDoc, getDocs, setDoc, onSnapshot,
+  writeBatch, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDqDBn0xtZqVYa9vgyufcJGMGMzc30z7kE",
+  authDomain: "planner-celula-gd.firebaseapp.com",
+  projectId: "planner-celula-gd",
+  storageBucket: "planner-celula-gd.firebasestorage.app",
+  messagingSenderId: "448252596891",
+  appId: "1:448252596891:web:5ee2b752f117da4b85ac3e"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const auth = getAuth(fbApp);
+const db = getFirestore(fbApp);
+const provider = new GoogleAuthProvider();
+provider.setCustomParameters({ prompt: 'select_account' });
+await setPersistence(auth, browserLocalPersistence);
+
+const coreRef = doc(db, 'planners', 'peregrinos');
+const photosRef = collection(db, 'plannerPhotos');
+let cloudReady = false;
+let saveTimer = null;
+let latestCore = null;
+let latestPhotos = new Map();
+let knownPhotoState = new Map();
+let unsubCore = null;
+let unsubPhotos = null;
+
+function makeAuthUi(){
+  const style=document.createElement('style');
+  style.textContent=`
+    .auth-gate{position:fixed;inset:0;z-index:9999;background:linear-gradient(145deg,#eff8df,#f9fbf5 52%,#dff3e9);display:flex;align-items:center;justify-content:center;padding:24px;font-family:'Inter',sans-serif}
+    .auth-card{width:min(430px,100%);background:#fff;border:1px solid #dfe8d7;border-radius:28px;box-shadow:0 24px 70px rgba(63,91,55,.16);padding:34px;text-align:center}
+    .auth-logo{width:64px;height:64px;border-radius:22px;margin:0 auto 18px;background:linear-gradient(145deg,#9ed72f,#5fbf43);display:flex;align-items:center;justify-content:center;font:800 28px 'Fraunces',serif;color:#fff}
+    .auth-card h1{margin:0 0 7px;font:600 29px 'Fraunces',serif;color:#172015}
+    .auth-card p{margin:0 auto 22px;color:#6d7767;font-size:14px;line-height:1.55;max-width:34ch}
+    .google-login{border:0;border-radius:999px;background:#62bf47;color:#fff;font-weight:800;font-size:14px;padding:12px 22px;min-width:210px;box-shadow:0 8px 18px rgba(98,191,71,.22)}
+    .google-login:hover{filter:brightness(1.03)}
+    .auth-msg{margin-top:15px;font-size:12.5px;color:#a5432e;line-height:1.45}
+    .cloud-user{font-size:11.5px;color:rgba(255,255,255,.75);line-height:1.4;padding:5px 2px 0}
+    .sync-chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#d7ead0;padding:4px 0}
+    .sync-dot{width:7px;height:7px;border-radius:50%;background:#9ed72f;box-shadow:0 0 0 3px rgba(158,215,47,.12)}
+  `;
+  document.head.appendChild(style);
+  const gate=document.createElement('div');
+  gate.className='auth-gate'; gate.id='auth-gate';
+  gate.innerHTML=`<div class="auth-card"><div class="auth-logo">P</div><h1>Planner Célula e GD</h1><p>Entre com a conta Google autorizada para acessar e sincronizar o planner.</p><button class="google-login" id="google-login">Entrar com Google</button><div class="auth-msg" id="auth-msg"></div></div>`;
+  document.body.appendChild(gate);
+  document.getElementById('google-login').onclick=async()=>{
+    const msg=document.getElementById('auth-msg'); msg.textContent='';
+    try{ await signInWithPopup(auth, provider); }
+    catch(err){
+      console.error(err);
+      if(err?.code==='auth/unauthorized-domain') msg.textContent=`Este endereço ainda não foi autorizado no Firebase (${location.hostname}). Vamos adicioná-lo em Authentication → Configurações → Domínios autorizados.`;
+      else msg.textContent='Não consegui fazer o login. Tente novamente.';
+    }
+  };
+}
+makeAuthUi();
+
+function setGate(open, message=''){
+  const gate=document.getElementById('auth-gate');
+  if(gate) gate.style.display=open?'flex':'none';
+  const msg=document.getElementById('auth-msg'); if(msg) msg.textContent=message;
+}
+function setSyncStatus(text, ok=true){
+  let node=document.getElementById('cloud-status');
+  if(!node){
+    const footer=document.querySelector('.sidebar-footer');
+    if(!footer) return;
+    node=document.createElement('div'); node.id='cloud-status'; node.className='sync-chip';
+    footer.prepend(node);
+  }
+  node.innerHTML=`<span class="sync-dot" style="${ok?'':'background:#d9a441'}"></span>${text}`;
+}
+function setUserUi(user){
+  const footer=document.querySelector('.sidebar-footer'); if(!footer) return;
+  let box=document.getElementById('cloud-user');
+  if(!box){
+    box=document.createElement('div'); box.id='cloud-user'; box.className='cloud-user';
+    footer.appendChild(box);
+    const btn=document.createElement('button'); btn.className='ghost-btn'; btn.id='btn-signout'; btn.textContent='Sair da conta';
+    btn.onclick=()=>signOut(auth); footer.appendChild(btn);
+  }
+  box.textContent=user?.email ? `Conectado como ${user.email}` : '';
+}
+
+function splitForCloud(data){
+  const core=JSON.parse(JSON.stringify(data));
+  const photos=new Map();
+  ['celula','gdJovens','gdAdultos'].forEach(group=>{
+    (core[group]?.pessoas||[]).forEach(p=>{
+      if(p.foto){ photos.set(`${group}__${p.id}`, {group, personId:p.id, foto:p.foto}); delete p.foto; }
+    });
+  });
+  return {core,photos};
+}
+function combineCloud(){
+  if(!latestCore) return;
+  const merged=JSON.parse(JSON.stringify(latestCore));
+  ['celula','gdJovens','gdAdultos'].forEach(group=>{
+    (merged[group]?.pessoas||[]).forEach(p=>{
+      const hit=latestPhotos.get(`${group}__${p.id}`);
+      if(hit?.foto) p.foto=hit.foto;
+    });
+  });
+  window.applyPlannerCloudData(merged);
+}
+
+async function writeCloudNow(data){
+  if(!cloudReady || !auth.currentUser) return;
+  setSyncStatus('Salvando…', false);
+  const {core,photos}=splitForCloud(data);
+  await setDoc(coreRef, { data: core, updatedAt: serverTimestamp() }, {merge:false});
+  const batch=writeBatch(db);
+  let ops=0;
+  for(const [id,obj] of photos){
+    if(knownPhotoState.get(id)!==obj.foto){ batch.set(doc(db,'plannerPhotos',id), obj); ops++; }
+  }
+  for(const id of knownPhotoState.keys()){
+    if(!photos.has(id)){ batch.delete(doc(db,'plannerPhotos',id)); ops++; }
+  }
+  if(ops) await batch.commit();
+  knownPhotoState=new Map([...photos].map(([id,obj])=>[id,obj.foto]));
+  setSyncStatus('Sincronizado');
+}
+window.queuePlannerCloudSave=(data)=>{
+  if(!cloudReady) return;
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>writeCloudNow(data).catch(err=>{
+    console.error(err); setSyncStatus('Erro ao sincronizar',false);
+  }),450);
+};
+
+async function loadInitialCloud(){
+  setSyncStatus('Conectando…', false);
+  try{
+    const snap=await getDoc(coreRef);
+    const photoSnap=await getDocs(photosRef);
+    latestPhotos=new Map();
+    photoSnap.forEach(d=> latestPhotos.set(d.id,d.data()));
+    knownPhotoState=new Map([...latestPhotos].map(([id,obj])=>[id,obj.foto]));
+    if(snap.exists()){
+      latestCore=snap.data().data || snap.data();
+      combineCloud();
+    }else{
+      // Primeiro uso: não publica dados privados embutidos no HTML. O usuário pode importar seu backup JSON.
+      await writeCloudNow(window.getPlannerData());
+    }
+    cloudReady=true;
+    setSyncStatus('Sincronizado');
+    unsubCore=onSnapshot(coreRef,s=>{
+      if(!s.exists()) return;
+      latestCore=s.data().data || s.data();
+      combineCloud();
+    },err=>console.error('Firestore core snapshot',err));
+    unsubPhotos=onSnapshot(photosRef,s=>{
+      latestPhotos=new Map();
+      s.forEach(d=>latestPhotos.set(d.id,d.data()));
+      knownPhotoState=new Map([...latestPhotos].map(([id,obj])=>[id,obj.foto]));
+      combineCloud();
+    },err=>console.error('Firestore photos snapshot',err));
+  }catch(err){
+    console.error(err);
+    if(err?.code==='permission-denied'){
+      setGate(true,'Esta conta Google não está autorizada a acessar este planner.');
+      const btn=document.getElementById('google-login'); if(btn){btn.textContent='Entrar com outra conta'; btn.onclick=async()=>{ await signOut(auth); await signInWithPopup(auth,provider); };}
+    }else{
+      setGate(true,'Não consegui acessar o banco de dados. Verifique sua conexão e tente novamente.');
+    }
+  }
+}
+
+onAuthStateChanged(auth, async user=>{
+  if(unsubCore){unsubCore();unsubCore=null;} if(unsubPhotos){unsubPhotos();unsubPhotos=null;}
+  cloudReady=false;
+  if(!user){ setGate(true,''); return; }
+  setUserUi(user);
+  setGate(false);
+  await loadInitialCloud();
+});
+</script>
+
+</body>
+</html>
